@@ -1,3 +1,38 @@
+# RoslynMcp
+
+A Model Context Protocol (MCP) server that brings Roslyn code intelligence to AI agents.
+
+## What It Is
+
+RoslynMcp is a .NET 8 application that exposes the power of [Roslyn](https://github.com/dotnet/roslyn) (the .NET compiler platform) through the MCP protocol. It acts as a bridge between AI assistants and your C# codebase, enabling deep code understanding and analysis.
+
+## Why It Exists
+
+Traditional AI code assistants often rely on simplistic pattern matching (grep/glob) which misses semantic context. RoslynMcp solves this by providing:
+
+- **Semantic understanding** — It knows what your code *means*, not just what it *says*
+- **Symbol resolution** — Understands types, methods, properties across your entire solution
+- **Call graph tracing** — See how code flows through your system
+- **Code smell detection** — Identifies potential issues using [Roslynator](https://github.com/dotnet/roslynator) analyzers
+
+## What You Can Use It For
+
+| Capability              | Description                                          |
+| ----------------------- | ---------------------------------------------------- |
+| **Load Solution**       | Initialize a .sln file and prepare the workspace     |
+| **Understand Codebase** | Quick orientation with complexity hotspots           |
+| **List Dependencies**   | Understand project relationships                     |
+| **List Types**          | Discover all classes, interfaces, enums in a project |
+| **List Members**        | Explore methods, properties, fields of any type      |
+| **Resolve Symbols**     | Get canonical IDs for any code symbol                |
+| **Explain Symbols**     | Understand what a symbol does and where it's used    |
+| **Trace Call Flow**     | See upstream callers or downstream callees           |
+| **Find Usages**         | Locate all references to a type/member               |
+| **Find Code Smells**    | Detect potential issues in a file                    |
+
+
+
+
 ## Public MCP API
 
 These are the public agent-facing tools. Descriptions are intentionally written as routing triggers so an agent prefers semantic code intelligence over generic `grep`/`glob` fallback.
@@ -10,6 +45,17 @@ MUST be called first: loads a `.sln` file and initializes the Roslyn workspace. 
 Parameters:
 - `solutionHintPath` (optional): Optional solution hint path (absolute or workspace-relative).
 
+
+
+### `understand_codebase`
+
+Quick codebase orientation: returns project structure with dependencies and hotspots (most complex/commented methods). Use at session start to identify high-impact areas. Profiles: `quick` (fast), `standard` (balanced), `deep` (thorough).
+
+Parameters:
+- `profile` (optional): Hotspot profile: `quick`, `standard`, or `deep`. Defaults to `standard`; unsupported values are treated as `standard`.
+
+
+
 ### `list_dependencies`
 
 Lists project dependencies. Returns all projects that a project depends on (`outgoing`), projects that depend on it (`incoming`), or both. Use at session start to understand project relationships. Without a specific project selector, returns dependencies across the solution.
@@ -21,12 +67,6 @@ Parameters:
 - `direction` (optional): Dependency direction: `outgoing`, `incoming`, or `both`. Defaults to `both`.
 
 
-### `understand_codebase`
-
-Quick codebase orientation: returns project structure with dependencies and hotspots (most complex/commented methods). Use at session start to identify high-impact areas. Profiles: `quick` (fast), `standard` (balanced), `deep` (thorough).
-
-Parameters:
-- `profile` (optional): Hotspot profile: `quick`, `standard`, or `deep`. Defaults to `standard`; unsupported values are treated as `standard`.
 
 ### `list_types`
 
@@ -41,6 +81,8 @@ Parameters:
 - `accessibility` (optional): Accessibility filter: `public`, `internal`, `protected`, `private`, `protected_internal`, or `private_protected`.
 - `limit` (optional): Maximum results to return. Defaults to `100`; clamped to `0..500`.
 - `offset` (optional): Zero-based pagination offset. Defaults to `0`.
+
+
 
 ### `list_members`
 
@@ -58,6 +100,8 @@ Parameters:
 - `limit` (optional): Maximum results to return. Defaults to `100`; clamped to `0..500`.
 - `offset` (optional): Zero-based pagination offset. Defaults to `0`.
 
+
+
 ### `resolve_symbol`
 
 Resolves a symbol into a canonical `symbolId`. Use this FIRST before `explain_symbol`, `trace_flow`, or `list_members`. Supports three selector modes: (A) `symbolId` lookup, (B) source position (`path+line+column`), or (C) `qualifiedName` (fully qualified or short name). Mode C requires project selector (`path`/`name`/`id`).
@@ -72,6 +116,8 @@ Parameters:
 - `projectName` (optional): Optional project selector for qualifiedName lookup: project name from `load_solution`.
 - `projectId` (optional): Optional project selector for qualifiedName lookup: projectId from `load_solution`.
 
+
+
 ### `explain_symbol`
 
 Explains a resolved symbol: its role, signature, containing namespace/type, key references (where it's used), and impact hints (zones with high reference density). Requires `symbolId` from `resolve_symbol` OR `path+line+column` pointing to the symbol.
@@ -81,6 +127,8 @@ Parameters:
 - `path` (optional): Symbol selector mode B: source file path used with `line+column`.
 - `line` (optional): Symbol selector mode B: 1-based line number used with `path+column`.
 - `column` (optional): Symbol selector mode B: 1-based column number used with `path+line`.
+
+
 
 ### `trace_flow`
 
@@ -94,6 +142,8 @@ Parameters:
 - `direction` (optional): Traversal direction: `upstream`, `downstream`, or `both`. Aliases `up`/`down` are accepted. Default is `both`.
 - `depth` (optional): Traversal depth as a non-negative integer. Defaults to `2` when omitted; values below `1` execute as depth `1`.
 
+
+
 ### `find_usages`
 
 Finds references/usages of a symbol within a project or the entire solution. Use to locate where a type, method, property, or field is being used. Returns reference locations with file paths and line numbers. Requires `symbolId` from `resolve_symbol`, `list_types`, or `list_members`.
@@ -101,6 +151,8 @@ Finds references/usages of a symbol within a project or the entire solution. Use
 Parameters:
 - `symbolId` (required): Canonical symbolId from `resolve_symbol`, `list_types`, or `list_members`.
 - `scope` (optional): Search scope: `project` (containing project) or `solution` (all projects, default).
+
+
 
 ### `find_codesmells`
 

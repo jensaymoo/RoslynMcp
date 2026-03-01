@@ -23,7 +23,7 @@ public sealed class AgentIntentToolRoutingTests
         var listTypes = new ListTypesTools(understanding);
         var listMembers = new ListMembersTools(understanding);
         var resolve = new ResolveSymbolTools(understanding);
-        var trace = new TraceFlowTools(flow);
+        var trace = new TraceCallFlowTools(flow);
         var modification = new CodeSmellTools(discovery);
         var listDependencies = new ListDependenciesTools(understanding);
         var findUsages = new FindUsagesTools(understanding.Navigation);

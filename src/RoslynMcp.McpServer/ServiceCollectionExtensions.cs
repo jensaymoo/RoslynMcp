@@ -37,7 +37,7 @@ public static class ServiceCollectionExtensions
             .WithTools<ListTypesTools>(serializerOptions)
             .WithTools<ListMembersTools>(serializerOptions)
             .WithTools<ResolveSymbolTools>(serializerOptions)
-            .WithTools<TraceFlowTools>(serializerOptions)
+            .WithTools<TraceCallFlowTools>(serializerOptions)
             .WithTools<CodeSmellTools>(serializerOptions)
             .WithTools<ListDependenciesTools>(serializerOptions)
             .WithTools<FindUsagesTools>(serializerOptions);
@@ -49,7 +49,7 @@ public static class ServiceCollectionExtensions
             .AddSingleton<ListTypesTools>()
             .AddSingleton<ListMembersTools>()
             .AddSingleton<ResolveSymbolTools>()
-            .AddSingleton<TraceFlowTools>()
+            .AddSingleton<TraceCallFlowTools>()
             .AddSingleton<CodeSmellTools>()
             .AddSingleton<ListDependenciesTools>()
             .AddSingleton<FindUsagesTools>();

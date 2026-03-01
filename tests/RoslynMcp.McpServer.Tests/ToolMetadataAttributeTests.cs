@@ -14,7 +14,7 @@ public sealed class ToolMetadataAttributeTests
     [InlineData(typeof(ListMembersTools), nameof(ListMembersTools.ListMembersAsync), "list_members")]
     [InlineData(typeof(ResolveSymbolTools), nameof(ResolveSymbolTools.ResolveSymbolAsync), "resolve_symbol")]
     [InlineData(typeof(ExplainSymbolTools), nameof(ExplainSymbolTools.ExplainSymbolAsync), "explain_symbol")]
-    [InlineData(typeof(TraceFlowTools), nameof(TraceFlowTools.TraceFlowAsync), "trace_flow")]
+    [InlineData(typeof(TraceCallFlowTools), nameof(TraceCallFlowTools.TraceFlowAsync), "trace_flow")]
     [InlineData(typeof(CodeSmellTools), nameof(CodeSmellTools.FindCodeSmellsAsync), "find_codesmells")]
     public void IntentEndpoints_ArePublishedWithExpectedNames(Type toolType, string methodName, string expectedName)
     {
@@ -36,7 +36,7 @@ public sealed class ToolMetadataAttributeTests
     [InlineData(typeof(ListMembersTools), nameof(ListMembersTools.ListMembersAsync))]
     [InlineData(typeof(ResolveSymbolTools), nameof(ResolveSymbolTools.ResolveSymbolAsync))]
     [InlineData(typeof(ExplainSymbolTools), nameof(ExplainSymbolTools.ExplainSymbolAsync))]
-    [InlineData(typeof(TraceFlowTools), nameof(TraceFlowTools.TraceFlowAsync))]
+    [InlineData(typeof(TraceCallFlowTools), nameof(TraceCallFlowTools.TraceFlowAsync))]
     [InlineData(typeof(CodeSmellTools), nameof(CodeSmellTools.FindCodeSmellsAsync))]
     public void IntentEndpoints_HaveMethodDescription(Type toolType, string methodName)
     {
@@ -55,7 +55,7 @@ public sealed class ToolMetadataAttributeTests
     [InlineData(typeof(ListMembersTools), nameof(ListMembersTools.ListMembersAsync))]
     [InlineData(typeof(ResolveSymbolTools), nameof(ResolveSymbolTools.ResolveSymbolAsync))]
     [InlineData(typeof(ExplainSymbolTools), nameof(ExplainSymbolTools.ExplainSymbolAsync))]
-    [InlineData(typeof(TraceFlowTools), nameof(TraceFlowTools.TraceFlowAsync))]
+    [InlineData(typeof(TraceCallFlowTools), nameof(TraceCallFlowTools.TraceFlowAsync))]
     [InlineData(typeof(CodeSmellTools), nameof(CodeSmellTools.FindCodeSmellsAsync))]
     public void IntentEndpoints_HaveParameterDescriptions(Type toolType, string methodName)
     {
@@ -81,7 +81,7 @@ public sealed class ToolMetadataAttributeTests
             [(typeof(ListMembersTools), nameof(ListMembersTools.ListMembersAsync))] = ["typeSymbolId", "path", "line", "column", "kind", "accessibility", "binding", "includeInherited", "limit", "offset"],
             [(typeof(ResolveSymbolTools), nameof(ResolveSymbolTools.ResolveSymbolAsync))] = ["symbolId", "path", "line", "column", "qualifiedName", "projectPath", "projectName", "projectId"],
             [(typeof(ExplainSymbolTools), nameof(ExplainSymbolTools.ExplainSymbolAsync))] = ["symbolId", "path", "line", "column"],
-            [(typeof(TraceFlowTools), nameof(TraceFlowTools.TraceFlowAsync))] = ["symbolId", "path", "line", "column", "direction", "depth"],
+            [(typeof(TraceCallFlowTools), nameof(TraceCallFlowTools.TraceFlowAsync))] = ["symbolId", "path", "line", "column", "direction", "depth"],
             [(typeof(CodeSmellTools), nameof(CodeSmellTools.FindCodeSmellsAsync))] = [],
         };
 
