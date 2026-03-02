@@ -1,13 +1,45 @@
 ![plot](assets/icon.png)
 
-# Get It on NuGet
 
-[![NuGet](https://img.shields.io/nuget/v/RoslynMcp.svg)](https://www.nuget.org/packages/RoslynMcp/)
-[![.NET](https://img.shields.io/badge/.NET-8.0-blue)](https://www.nuget.org/packages/RoslynMcp/)
 
 # RoslynMcp
 
 A Model Context Protocol (MCP) server that brings Roslyn code intelligence to AI agents.
+
+
+## Get It on NuGet
+
+[![NuGet](https://img.shields.io/nuget/v/RoslynMcp.svg)](https://www.nuget.org/packages/RoslynMcp/)
+[![.NET](https://img.shields.io/badge/.NET-8.0-blue)](https://www.nuget.org/packages/RoslynMcp/)
+
+_This project uses Roslynator, licensed under Apache 2.0._
+
+#### Installation
+
+```bash
+dotnet tool install -g RoslynMcp
+```
+
+#### Update
+
+```bash
+dotnet tool update -g RoslynMcp
+```
+
+
+#### MCP config (OpenCode)
+
+```json
+  "mcp": {
+    "code inspection": {
+      "type": "local",
+      "command": [
+        "roslynmcp"
+      ]
+    }
+  }
+```
+
 
 ## What It Is
 
@@ -180,39 +212,3 @@ Finds deterministic code-smell candidates in a document by probing Roslyn diagno
 Parameters:
 - `path` (required): Source document path. The file must exist in the currently loaded solution.
 
-
-
-## Quick Start (Recommended)
-
-Run the server from source for the most reliable `MSBuildWorkspace` behavior.
-
-### Prerequisites
-
-- .NET SDK 8.0 (or the version pinned by `global.json`)
-- A usable MSBuild environment (normally available with the .NET SDK)
-
-### Installation
-
-```bash
-dotnet tool install -g RoslynMcp
-```
-
-### Update
-
-```bash
-dotnet tool update -g RoslynMcp
-```
-
-
-### MCP config (OpenCode)
-
-```json
-{
-  "roslyn": {
-    "type": "local",
-    "command": [ "roslynmcp" ]
-  }
-}
-```
-
-_This project uses Roslynator, licensed under Apache 2.0._
