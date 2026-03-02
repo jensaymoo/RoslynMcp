@@ -28,7 +28,8 @@ Traditional AI code assistants often rely on simplistic pattern matching (grep/g
 | **Explain Symbols**     | Understand what a symbol does and where it's used    |
 | **Trace Call Flow**     | See upstream callers or downstream callees           |
 | **Find Usages**         | Locate all references to a type/member               |
-| **Find Code Smells**    | Detect potential issues in a file                    |
+| **Get Type Hierarchy** | Explore type inheritance and derived types          |
+| **Find Code Smells**    | Detect potential issues in a file                     |
 
 
 
@@ -151,6 +152,17 @@ Finds references/usages of a symbol within a project or the entire solution. Use
 Parameters:
 - `symbolId` (required): Canonical symbolId from `resolve_symbol`, `list_types`, or `list_members`.
 - `scope` (optional): Search scope: `project` (containing project) or `solution` (all projects, default).
+
+
+
+### `get_type_hierarchy`
+
+Gets the complete type hierarchy for a type: base classes, implemented interfaces, and derived types. Use to understand inheritance relationships and type evolution. Requires `symbolId` from `resolve_symbol`, `list_types`, or `list_members`.
+
+Parameters:
+- `symbolId` (required): Canonical symbolId from `resolve_symbol`, `list_types`, or `list_members`. Must resolve to a type (class, interface, enum, struct, record).
+- `includeTransitive` (optional): When `true` (default), includes all transitive base types and derived types. When `false`, only immediate parents/children.
+- `maxDerived` (optional): Maximum number of derived types to return. Default `200`. Higher values may impact performance.
 
 
 
