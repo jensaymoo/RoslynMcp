@@ -7,7 +7,6 @@ using RoslynMcp.Infrastructure.Analysis;
 using RoslynMcp.Infrastructure.Navigation;
 using RoslynMcp.Infrastructure.Workspace;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace RoslynMcp.Infrastructure.Agent;

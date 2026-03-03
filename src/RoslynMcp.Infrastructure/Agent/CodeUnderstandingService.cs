@@ -1,6 +1,6 @@
 using RoslynMcp.Core.Contracts;
 using RoslynMcp.Core.Models.Agent;
-using RoslynMcp.Core.Models.Navigation;
+using RoslynMcp.Infrastructure.Agent.Handlers;
 using RoslynMcp.Infrastructure.Navigation;
 using RoslynMcp.Infrastructure.Workspace;
 
