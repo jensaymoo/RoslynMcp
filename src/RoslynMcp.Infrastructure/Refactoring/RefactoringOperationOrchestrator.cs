@@ -109,65 +109,29 @@ internal sealed class RefactoringOperationOrchestrator : IRefactoringOperationOr
         int missingFileCount,
         string? reloadErrorCode = null)
     {
-        return new ExecuteCleanupResult(
+        return RefactoringOperationExtensions.CreateStaleWorkspaceResult(
             scope,
-            Array.Empty<string>(),
-            Array.Empty<string>(),
-            BuildCleanupMetadataWarnings(healthCheckPerformed, autoReloadAttempted, autoReloadSucceeded),
-            CreateError(
-                ErrorCodes.StaleWorkspaceSnapshot,
-                CleanupStaleWorkspaceMessage,
-                ("operation", "execute_cleanup"),
-                (CleanupHealthCheckPerformedDetail, BoolToLowerInvariantString(healthCheckPerformed)),
-                (CleanupAutoReloadAttemptedDetail, BoolToLowerInvariantString(autoReloadAttempted)),
-                (CleanupAutoReloadSucceededDetail, BoolToLowerInvariantString(autoReloadSucceeded)),
-                (CleanupMissingFileCountDetail, missingFileCount.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                (CleanupReloadErrorCodeDetail, reloadErrorCode)));
+            healthCheckPerformed,
+            autoReloadAttempted,
+            autoReloadSucceeded,
+            missingFileCount,
+            reloadErrorCode);
     }
 
     internal static IReadOnlyList<string> BuildCleanupMetadataWarnings(bool healthCheckPerformed, bool autoReloadAttempted, bool autoReloadSucceeded)
-        =>
-        [
-            $"meta.{CleanupHealthCheckPerformedDetail}={BoolToLowerInvariantString(healthCheckPerformed)}",
-            $"meta.{CleanupAutoReloadAttemptedDetail}={BoolToLowerInvariantString(autoReloadAttempted)}",
-            $"meta.{CleanupAutoReloadSucceededDetail}={BoolToLowerInvariantString(autoReloadSucceeded)}"
-        ];
+        => RefactoringOperationExtensions.BuildCleanupMetadataWarnings(healthCheckPerformed, autoReloadAttempted, autoReloadSucceeded);
 
     internal static CleanupWorkspaceHealth EvaluateWorkspaceFilesystemHealth(IReadOnlyList<Document> scopedDocuments)
-    {
-        var missingRootedFiles = scopedDocuments
-            .Select(static document => document.FilePath)
-            .Where(static path => !string.IsNullOrWhiteSpace(path))
-            .Select(static path => path!)
-            .Where(static filePath => Path.IsPathRooted(filePath))
-            .Where(static path => !File.Exists(path))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(static path => path, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-        return new CleanupWorkspaceHealth(missingRootedFiles.Length == 0, missingRootedFiles);
-    }
-
-    internal static string BoolToLowerInvariantString(bool value)
-        => value ? "true" : "false";
-
-    internal sealed record CleanupWorkspaceHealth(bool IsConsistent, IReadOnlyList<string> MissingRootedFiles);
+        => scopedDocuments.EvaluateWorkspaceFilesystemHealth();
 
     public Task<RenameSymbolResult> RenameSymbolAsync(RenameSymbolRequest request, CancellationToken ct)
         => _renameOperations.RenameSymbolAsync(request, ct);
 
     internal static RenameSymbolResult CreateErrorResult(string code, string message, params (string Key, string? Value)[] details)
-        => new(null, 0, Array.Empty<SourceLocation>(), Array.Empty<string>(), CreateError(code, message, details));
+        => RefactoringOperationExtensions.CreateErrorResult(code, message, details);
 
     internal static IReadOnlyList<string> BuildCleanupRuleIds()
-        =>
-        [
-            CleanupRuleRemoveUnusedUsings,
-            CleanupRuleOrganizeUsings,
-            CleanupRuleFixModifierOrder,
-            CleanupRuleAddReadonly,
-            CleanupRuleFormat
-        ];
+        => RefactoringOperationExtensions.BuildCleanupRuleIds();
 
     internal async Task<Solution> ApplyDiagnosticCleanupStepAsync(
         Solution solution,
@@ -250,7 +214,7 @@ internal sealed class RefactoringOperationOrchestrator : IRefactoringOperationOr
                 continue;
             }
 
-            var organizedRoot = OrganizeUsings(compilationUnit);
+            var organizedRoot = compilationUnit.OrganizeUsings();
             if (organizedRoot.IsEquivalentTo(compilationUnit))
             {
                 continue;
@@ -263,36 +227,10 @@ internal sealed class RefactoringOperationOrchestrator : IRefactoringOperationOr
     }
 
     internal static CompilationUnitSyntax OrganizeUsings(CompilationUnitSyntax root)
-    {
-        var updated = root.WithUsings(SortUsingDirectives(root.Usings));
-        foreach (var namespaceDeclaration in updated.DescendantNodes().OfType<BaseNamespaceDeclarationSyntax>())
-        {
-            var orderedUsings = SortUsingDirectives(namespaceDeclaration.Usings);
-            if (orderedUsings == namespaceDeclaration.Usings)
-            {
-                continue;
-            }
-
-            updated = updated.ReplaceNode(namespaceDeclaration, namespaceDeclaration.WithUsings(orderedUsings));
-        }
-
-        return updated;
-    }
+        => root.OrganizeUsings();
 
     internal static SyntaxList<UsingDirectiveSyntax> SortUsingDirectives(SyntaxList<UsingDirectiveSyntax> usings)
-    {
-        if (usings.Count <= 1)
-        {
-            return usings;
-        }
-
-        return SyntaxFactory.List(
-            usings
-                .OrderBy(static directive => directive.Alias == null ? 1 : 0)
-                .ThenBy(static directive => directive.StaticKeyword.IsKind(SyntaxKind.StaticKeyword) ? 1 : 0)
-                .ThenBy(static directive => directive.Name?.ToString(), StringComparer.Ordinal)
-                .ThenBy(static directive => directive.Alias?.Name.Identifier.ValueText ?? string.Empty, StringComparer.Ordinal));
-    }
+        => usings.SortUsingDirectives();
 
     internal async Task<Solution> FormatScopeAsync(Solution solution, IReadOnlyList<Document> scopeDocuments, CancellationToken ct)
     {
@@ -320,37 +258,10 @@ internal sealed class RefactoringOperationOrchestrator : IRefactoringOperationOr
     }
 
     internal static ErrorInfo CreateError(string code, string message, params (string Key, string? Value)[] details)
-    {
-        if (details.Length == 0)
-        {
-            return new ErrorInfo(code, message);
-        }
-
-        var map = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var (key, value) in details)
-        {
-            if (!string.IsNullOrWhiteSpace(key) && !string.IsNullOrWhiteSpace(value))
-            {
-                map[key] = value;
-            }
-        }
-
-        return map.Count == 0 ? new ErrorInfo(code, message) : new ErrorInfo(code, message, map);
-    }
+        => RefactoringOperationExtensions.CreateError(code, message, details);
 
     internal static ErrorInfo? TryCreateInvalidSymbolIdError(string symbolId, string operation)
-    {
-        if (!string.IsNullOrWhiteSpace(symbolId))
-        {
-            return null;
-        }
-
-        return CreateError(
-            ErrorCodes.InvalidInput,
-            "symbolId must be a non-empty, non-whitespace string.",
-            ("parameter", "symbolId"),
-            ("operation", operation));
-    }
+        => RefactoringOperationExtensions.TryCreateInvalidSymbolIdError(symbolId, operation);
 
     internal async Task<(Solution? Solution, ErrorInfo? Error)> TryGetSolutionAsync(CancellationToken ct)
     {
@@ -370,30 +281,13 @@ internal sealed class RefactoringOperationOrchestrator : IRefactoringOperationOr
     }
 
     internal static bool IsValidIdentifierForSymbol(ISymbol symbol, string candidate)
-    {
-        if (string.IsNullOrWhiteSpace(candidate))
-        {
-            return false;
-        }
-
-        if (symbol.Language == LanguageNames.CSharp)
-        {
-            return SyntaxFacts.IsValidIdentifier(candidate);
-        }
-
-        return true;
-    }
+        => candidate.IsValidIdentifier(symbol);
 
     internal static SourceLocation CreateSourceLocation(Location location)
-    {
-        var span = location.GetLineSpan();
-        var filePath = span.Path ?? string.Empty;
-        var start = span.StartLinePosition;
-        return new SourceLocation(filePath, start.Line + 1, start.Character + 1);
-    }
+        => location.ToSourceLocation();
 
     internal static string GetLocationKey(SourceLocation location)
-        => string.Join(':', location.FilePath, location.Line, location.Column);
+        => location.GetLocationKey();
 
     internal static async Task<IReadOnlyList<SourceLocation>> CollectAffectedLocationsAsync(ISymbol symbol, Solution solution, CancellationToken ct)
     {
@@ -412,8 +306,8 @@ internal sealed class RefactoringOperationOrchestrator : IRefactoringOperationOr
                     continue;
                 }
 
-                var sourceLocation = CreateSourceLocation(location.Location);
-                var key = GetLocationKey(sourceLocation);
+                var sourceLocation = location.Location.ToSourceLocation();
+                var key = sourceLocation.GetLocationKey();
                 if (seen.Add(key))
                 {
                     locations.Add(sourceLocation);
@@ -423,8 +317,8 @@ internal sealed class RefactoringOperationOrchestrator : IRefactoringOperationOr
 
         foreach (var location in symbol.Locations.Where(l => l.IsInSource))
         {
-            var sourceLocation = CreateSourceLocation(location);
-            var key = GetLocationKey(sourceLocation);
+            var sourceLocation = location.ToSourceLocation();
+            var key = sourceLocation.GetLocationKey();
             if (seen.Add(key))
             {
                 locations.Add(sourceLocation);
@@ -465,16 +359,16 @@ internal sealed class RefactoringOperationOrchestrator : IRefactoringOperationOr
     }
 
     internal static ISet<string> GetSourceLocationKeys(ISymbol symbol)
-    {
-        var keys = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var location in symbol.Locations.Where(static l => l.IsInSource))
-        {
-            var sourceLocation = CreateSourceLocation(location);
-            keys.Add(GetLocationKey(sourceLocation));
-        }
+        => symbol.GetSourceLocationKeys();
 
-        return keys;
-    }
+    internal static bool WouldConflict(ISymbol symbol, string newName)
+        => symbol.WouldConflict(newName);
+
+    internal static bool SymbolConflicts(ISymbol original, ISymbol existing)
+        => original.ConflictsWith(existing);
+
+    internal static bool IsValidScope(string scope)
+        => scope.IsValidScope();
 
     internal async Task<ISymbol?> TryResolveRenamedSymbolAsync(Solution solution,
         string newName,
@@ -510,98 +404,6 @@ internal sealed class RefactoringOperationOrchestrator : IRefactoringOperationOr
         return null;
     }
 
-    internal static bool WouldConflict(ISymbol symbol, string newName)
-    {
-        if (string.Equals(symbol.Name, newName, StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        var members = symbol.ContainingType?.GetMembers(newName) ?? default;
-        if (members.IsDefaultOrEmpty && symbol.ContainingNamespace != null)
-        {
-            members = symbol.ContainingNamespace.GetMembers(newName)
-                .Cast<ISymbol>()
-                .ToImmutableArray();
-        }
-
-        if (members.IsDefaultOrEmpty)
-        {
-            return false;
-        }
-
-        foreach (var member in members)
-        {
-            if (SymbolConflicts(symbol, member))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    internal static bool SymbolConflicts(ISymbol original, ISymbol existing)
-    {
-        var normalizedOriginal = original.OriginalDefinition ?? original;
-        var normalizedExisting = existing.OriginalDefinition ?? existing;
-
-        if (SymbolEqualityComparer.Default.Equals(normalizedOriginal, normalizedExisting))
-        {
-            return false;
-        }
-
-        if (normalizedOriginal.Kind != normalizedExisting.Kind)
-        {
-            return false;
-        }
-
-        if (normalizedOriginal is IMethodSymbol originalMethod && normalizedExisting is IMethodSymbol existingMethod)
-        {
-            if (originalMethod.Parameters.Length != existingMethod.Parameters.Length)
-            {
-                return false;
-            }
-
-            for (var i = 0; i < originalMethod.Parameters.Length; i++)
-            {
-                if (!SymbolEqualityComparer.Default.Equals(originalMethod.Parameters[i].Type, existingMethod.Parameters[i].Type))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        if (normalizedOriginal is IPropertySymbol && normalizedExisting is IPropertySymbol)
-        {
-            return true;
-        }
-
-        if (normalizedOriginal is IFieldSymbol && normalizedExisting is IFieldSymbol)
-        {
-            return true;
-        }
-
-        if (normalizedOriginal is IEventSymbol && normalizedExisting is IEventSymbol)
-        {
-            return true;
-        }
-
-        if (normalizedOriginal is INamedTypeSymbol && normalizedExisting is INamedTypeSymbol)
-        {
-            return true;
-        }
-
-        return true;
-    }
-
-    internal static bool IsValidScope(string scope)
-        => string.Equals(scope, "document", StringComparison.Ordinal)
-           || string.Equals(scope, "project", StringComparison.Ordinal)
-           || string.Equals(scope, "solution", StringComparison.Ordinal);
-
     internal async Task<(Solution? Solution, int Version, ErrorInfo? Error)> TryGetSolutionWithVersionAsync(CancellationToken ct)
     {
         var (solution, solutionError) = await TryGetSolutionAsync(ct).ConfigureAwait(false);
@@ -632,146 +434,35 @@ internal sealed class RefactoringOperationOrchestrator : IRefactoringOperationOr
     }
 
     internal static IEnumerable<Document> ResolveScopeDocuments(Solution solution, string scope, string? path)
-    {
-        if (string.Equals(scope, "solution", StringComparison.Ordinal) || string.IsNullOrWhiteSpace(path))
-        {
-            return solution.Projects.SelectMany(static project => project.Documents);
-        }
-
-        if (string.Equals(scope, "project", StringComparison.Ordinal))
-        {
-            return solution.Projects
-                .Where(project => MatchesByNormalizedPath(project.FilePath, path)
-                                  || string.Equals(project.Name, path, StringComparison.OrdinalIgnoreCase))
-                .SelectMany(static project => project.Documents);
-        }
-
-        return solution.Projects
-            .SelectMany(static project => project.Documents)
-            .Where(document => MatchesByNormalizedPath(document.FilePath, path));
-    }
+        => solution.ResolveScopeDocuments(scope, path);
 
     internal static bool MatchesByNormalizedPath(string? candidatePath, string path)
-    {
-        if (string.IsNullOrWhiteSpace(candidatePath) || string.IsNullOrWhiteSpace(path))
-        {
-            return false;
-        }
-
-        try
-        {
-            var normalizedCandidate = System.IO.Path.GetFullPath(candidatePath);
-            var normalizedPath = System.IO.Path.GetFullPath(path);
-            return string.Equals(normalizedCandidate, normalizedPath, StringComparison.OrdinalIgnoreCase);
-        }
-        catch (Exception)
-        {
-            return string.Equals(candidatePath, path, StringComparison.OrdinalIgnoreCase);
-        }
-    }
+        => candidatePath.MatchesByNormalizedPath(path);
 
     internal static HashSet<string>? CreateDiagnosticFilter(IReadOnlyList<string>? diagnosticIds)
-    {
-        if (diagnosticIds == null || diagnosticIds.Count == 0)
-        {
-            return null;
-        }
-
-        var filter = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var id in diagnosticIds)
-        {
-            if (!string.IsNullOrWhiteSpace(id))
-            {
-                filter.Add(id.Trim());
-            }
-        }
-
-        return filter.Count == 0 ? null : filter;
-    }
+        => diagnosticIds.ToDiagnosticFilter();
 
     internal static bool IsSupportedDiagnostic(Diagnostic diagnostic)
-        => SupportedFixDiagnosticIds.Contains(diagnostic.Id);
+        => diagnostic.IsSupportedDiagnostic();
 
     internal static async Task<LocalDeclarationStatementSyntax?> TryGetUnusedLocalDeclarationAsync(
         Document document,
         Diagnostic diagnostic,
         CancellationToken ct)
-    {
-        var root = await document.GetSyntaxRootAsync(ct).ConfigureAwait(false);
-        if (root == null)
-        {
-            return null;
-        }
-
-        var token = root.FindToken(diagnostic.Location.SourceSpan.Start);
-        var declaration = token.Parent?.AncestorsAndSelf().OfType<LocalDeclarationStatementSyntax>().FirstOrDefault();
-        if (declaration == null)
-        {
-            return null;
-        }
-
-        if (declaration.Declaration.Variables.Count != 1)
-        {
-            return null;
-        }
-
-        return declaration;
-    }
+        => await document.TryGetUnusedLocalDeclarationAsync(diagnostic, ct).ConfigureAwait(false);
 
     internal static CodeFixDescriptor CreateFixDescriptor(
         Document document,
         Diagnostic diagnostic,
         LocalDeclarationStatementSyntax declaration,
         int workspaceVersion)
-    {
-        var location = CreateSourceLocation(diagnostic.Location);
-        var variableName = declaration.Declaration.Variables[0].Identifier.ValueText;
-        var title = $"Remove unused local variable '{variableName}'";
-        var filePath = document.FilePath ?? document.Name;
-        var fixId = BuildFixId(workspaceVersion, diagnostic.Id, declaration.Span.Start, declaration.Span.Length, filePath);
-        return new CodeFixDescriptor(fixId, title, diagnostic.Id, SupportedFixCategory, location, filePath);
-    }
+        => declaration.ToFixDescriptor(document, diagnostic, workspaceVersion);
 
     internal static string BuildFixId(int workspaceVersion, string diagnosticId, int spanStart, int spanLength, string filePath)
-    {
-        var encodedPath = Convert.ToBase64String(Encoding.UTF8.GetBytes(filePath));
-        return string.Join('|', "v1", workspaceVersion, SupportedFixOperation, diagnosticId, spanStart, spanLength, encodedPath);
-    }
+        => RefactoringOperationExtensions.BuildFixId(workspaceVersion, diagnosticId, spanStart, spanLength, filePath);
 
     internal static ParsedFixId? ParseFixId(string fixId)
-    {
-        if (string.IsNullOrWhiteSpace(fixId))
-        {
-            return null;
-        }
-
-        var parts = fixId.Split('|');
-        if (parts.Length != 7)
-        {
-            return null;
-        }
-
-        if (!string.Equals(parts[0], "v1", StringComparison.Ordinal)
-            || !string.Equals(parts[2], SupportedFixOperation, StringComparison.Ordinal)
-            || !int.TryParse(parts[1], out var version)
-            || !int.TryParse(parts[4], out var spanStart)
-            || !int.TryParse(parts[5], out var spanLength))
-        {
-            return null;
-        }
-
-        string filePath;
-        try
-        {
-            filePath = Encoding.UTF8.GetString(Convert.FromBase64String(parts[6]));
-        }
-        catch (FormatException)
-        {
-            return null;
-        }
-
-        return new ParsedFixId(version, parts[3], spanStart, spanLength, filePath);
-    }
+        => RefactoringOperationExtensions.ParseFixId(fixId);
 
     internal async Task<FixOperation?> TryBuildFixOperationAsync(Solution solution, ParsedFixId fix, CancellationToken ct)
     {
@@ -782,7 +473,7 @@ internal sealed class RefactoringOperationOrchestrator : IRefactoringOperationOr
 
         var document = solution.Projects
             .SelectMany(static project => project.Documents)
-            .FirstOrDefault(d => MatchesByNormalizedPath(d.FilePath, fix.FilePath));
+            .FirstOrDefault(d => d.FilePath.MatchesByNormalizedPath(fix.FilePath));
         if (document == null)
         {
             return null;
@@ -1058,7 +749,7 @@ internal sealed class RefactoringOperationOrchestrator : IRefactoringOperationOr
     {
         var document = solution.Projects
             .SelectMany(static project => project.Documents)
-            .FirstOrDefault(d => MatchesByNormalizedPath(d.FilePath, identity.FilePath));
+            .FirstOrDefault(d => d.FilePath.MatchesByNormalizedPath(identity.FilePath));
         if (document == null)
         {
             return null;
@@ -1111,7 +802,7 @@ internal sealed class RefactoringOperationOrchestrator : IRefactoringOperationOr
     {
         var document = solution.Projects
             .SelectMany(static project => project.Documents)
-            .FirstOrDefault(d => MatchesByNormalizedPath(d.FilePath, identity.FilePath));
+            .FirstOrDefault(d => d.FilePath.MatchesByNormalizedPath(identity.FilePath));
         if (document == null)
         {
             return null;
@@ -1229,18 +920,10 @@ internal sealed class RefactoringOperationOrchestrator : IRefactoringOperationOr
 
     internal static Document? FindDocument(Solution solution, string filePath)
         => solution.Projects.SelectMany(static project => project.Documents)
-            .FirstOrDefault(d => MatchesByNormalizedPath(d.FilePath, filePath));
+            .FirstOrDefault(d => d.FilePath.MatchesByNormalizedPath(filePath));
 
     internal static bool MatchesProviderAction(ActionExecutionIdentity identity, CodeAction action, string actionTitle)
-    {
-        if (!string.IsNullOrWhiteSpace(identity.RefactoringId)
-            && string.Equals(identity.RefactoringId, action.EquivalenceKey, StringComparison.Ordinal))
-        {
-            return true;
-        }
-
-        return string.Equals(action.Title, actionTitle, StringComparison.Ordinal);
-    }
+        => identity.MatchesProviderAction(action, actionTitle);
 
     internal async Task<IReadOnlyList<Diagnostic>> GetProviderDiagnosticsForDocumentAsync(Document document, CancellationToken ct)
     {
@@ -1374,96 +1057,31 @@ internal sealed class RefactoringOperationOrchestrator : IRefactoringOperationOr
     }
 
     internal static TextSpan CreateSelectionSpan(int position, int? selectionStart, int? selectionLength)
-    {
-        if (selectionStart.HasValue && selectionLength.HasValue)
-        {
-            return new TextSpan(selectionStart.Value, selectionLength.Value);
-        }
-
-        return new TextSpan(position, 0);
-    }
+        => RefactoringOperationExtensions.CreateSelectionSpan(position, selectionStart, selectionLength);
 
     internal static string GetCodeFixCategory(Diagnostic diagnostic)
-        => string.IsNullOrWhiteSpace(diagnostic.Descriptor.Category)
-            ? SupportedFixCategory
-            : diagnostic.Descriptor.Category.Trim().ToLowerInvariant();
+        => diagnostic.GetCodeFixCategory();
 
     internal static string BuildProviderCodeFixKey(string providerType, string diagnosticId, string? equivalenceKey, string title)
-        => string.Join('|', "cf", EncodeKey(providerType), EncodeKey(diagnosticId), EncodeKey(equivalenceKey), EncodeKey(title));
+        => RefactoringOperationExtensions.BuildProviderCodeFixKey(providerType, diagnosticId, equivalenceKey, title);
 
     internal static string BuildProviderRefactoringKey(string providerType, string? equivalenceKey, string title)
-        => string.Join('|', "rf", EncodeKey(providerType), EncodeKey(equivalenceKey), EncodeKey(title));
+        => RefactoringOperationExtensions.BuildProviderRefactoringKey(providerType, equivalenceKey, title);
 
     internal static bool TryParseProviderCodeFixKey(string key, out ProviderCodeFixKey parsed)
-    {
-        parsed = default;
-        if (string.IsNullOrWhiteSpace(key))
-        {
-            return false;
-        }
-
-        var parts = key.Split('|');
-        if (parts.Length != 5 || !string.Equals(parts[0], "cf", StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        var providerType = DecodeKey(parts[1]);
-        var diagnosticId = DecodeKey(parts[2]);
-        if (string.IsNullOrWhiteSpace(providerType) || string.IsNullOrWhiteSpace(diagnosticId))
-        {
-            return false;
-        }
-
-        parsed = new ProviderCodeFixKey(providerType, diagnosticId, NormalizeNullable(DecodeKey(parts[3])), DecodeKey(parts[4]));
-        return true;
-    }
+        => RefactoringOperationExtensions.TryParseProviderCodeFixKey(key, out parsed);
 
     internal static bool TryParseProviderRefactoringKey(string key, out ProviderRefactoringKey parsed)
-    {
-        parsed = default;
-        if (string.IsNullOrWhiteSpace(key))
-        {
-            return false;
-        }
-
-        var parts = key.Split('|');
-        if (parts.Length != 4 || !string.Equals(parts[0], "rf", StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        var providerType = DecodeKey(parts[1]);
-        if (string.IsNullOrWhiteSpace(providerType))
-        {
-            return false;
-        }
-
-        parsed = new ProviderRefactoringKey(providerType, NormalizeNullable(DecodeKey(parts[2])), DecodeKey(parts[3]));
-        return true;
-    }
+        => RefactoringOperationExtensions.TryParseProviderRefactoringKey(key, out parsed);
 
     internal static string EncodeKey(string? value)
-        => Convert.ToBase64String(Encoding.UTF8.GetBytes(value ?? string.Empty));
+        => RefactoringOperationExtensions.EncodeKey(value);
 
     internal static string DecodeKey(string encoded)
-    {
-        try
-        {
-            return Encoding.UTF8.GetString(Convert.FromBase64String(encoded));
-        }
-        catch (FormatException)
-        {
-            return string.Empty;
-        }
-    }
+        => RefactoringOperationExtensions.DecodeKey(encoded);
 
     internal static async Task<SourceLocation> CreateSourceLocationFromSpanAsync(Document document, TextSpan span, CancellationToken ct)
-    {
-        var text = await document.GetTextAsync(ct).ConfigureAwait(false);
-        var line = text.Lines.GetLineFromPosition(span.Start);
-        return new SourceLocation(document.FilePath ?? document.Name, line.LineNumber + 1, span.Start - line.Start + 1);
-    }
+        => await document.ToSourceLocationAsync(span, ct).ConfigureAwait(false);
 
     internal async Task<Solution?> TryApplyCodeActionToSolutionAsync(Solution currentSolution, CodeAction action, CancellationToken ct)
     {
@@ -1503,29 +1121,18 @@ internal sealed class RefactoringOperationOrchestrator : IRefactoringOperationOr
     }
 
     internal static bool IntersectsSelection(TextSpan span, int? selectionStart, int? selectionLength)
-    {
-        if (!selectionStart.HasValue || !selectionLength.HasValue)
-        {
-            return true;
-        }
-
-        var selection = new TextSpan(selectionStart.Value, selectionLength.Value);
-        return selection.OverlapsWith(span) || selection.Contains(span.Start) || span.Contains(selection.Start);
-    }
+        => span.IntersectsSelection(selectionStart, selectionLength);
 
     internal static PreviewCodeFixResult CreatePreviewError(string code, string message)
-        => CreatePreviewError(CreateError(code, message, ("operation", "preview_code_fix")));
+        => RefactoringOperationExtensions.CreatePreviewError(code, message);
 
     internal static PreviewCodeFixResult CreatePreviewError(ErrorInfo error)
-        => new(string.Empty, string.Empty, Array.Empty<ChangedFilePreview>(), error);
+        => RefactoringOperationExtensions.CreatePreviewError(error);
 
     internal static ApplyCodeFixResult CreateApplyError(string fixId, string code, string message)
-        => new(fixId,
-            0,
-            Array.Empty<string>(),
-            CreateError(code, message, ("fixId", fixId), ("operation", "apply_code_fix")));
+        => RefactoringOperationExtensions.CreateApplyError(fixId, code, message);
 
     internal static string? NormalizeNullable(string? value)
-        => string.IsNullOrWhiteSpace(value) ? null : value;
+        => RefactoringOperationExtensions.NormalizeNullable(value);
 
 }
