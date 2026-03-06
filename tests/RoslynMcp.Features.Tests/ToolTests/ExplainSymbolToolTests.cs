@@ -19,8 +19,8 @@ public sealed class ExplainSymbolToolTests(FeatureTestsFixture fixture, ITestOut
         result.Symbol.IsNotNull();
         result.Symbol!.Name.Is("AppOrchestrator");
 
-        result.RoleSummary.ShouldNotBeEmtpy();
-        result.Signature.ShouldNotBeEmtpy();
+        result.RoleSummary.ShouldNotBeEmpty();
+        result.Signature.ShouldNotBeEmpty();
         
     }
 

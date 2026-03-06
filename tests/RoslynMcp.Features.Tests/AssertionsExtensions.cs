@@ -1,13 +1,19 @@
 using Is.Assertions;
 using RoslynMcp.Core.Models;
 using RoslynMcp.Features.Tests.ToolTests;
-using Xunit;
 
 namespace RoslynMcp.Features.Tests;
 
 public static class AssertionsExtensions
 {
-
+    extension(string text)
+    {
+        public void ShouldNotBeEmpty()
+        {
+            string.IsNullOrEmpty(text).IsFalse();
+        }
+    }
+    
     extension(ErrorInfo? error)
     {
         public void ShouldBeNone()
@@ -22,26 +28,35 @@ public static class AssertionsExtensions
         }
     }
 
-    public static void ShouldNotBeEmtpy(this string text)
+    extension(ResolvedSymbolSummary? symbol)
     {
-        string.IsNullOrEmpty(text).IsFalse();
+        public void ShouldMatchResolvedSymbol(string expectedDisplayName, string expectedKind, string expectedFileName)
+        {
+            symbol.IsNotNull();
+            symbol!.DisplayName.Is(expectedDisplayName);
+            symbol.Kind.Is(expectedKind);
+            symbol.FilePath.EndsWith(expectedFileName, StringComparison.OrdinalIgnoreCase).IsTrue();
+            symbol.SymbolId.ShouldNotBeEmpty();
+        }
     }
 
-    
-    public static void ShouldMatchFindings(this IReadOnlyList<CodeSmellMatch> actual, ExpectedCodeSmellFinding[] expected)
+    extension(IReadOnlyList<CodeSmellMatch> actual)
     {
-        actual.Count.Is(expected.Length);
-
-        for (var i = 0; i < expected.Length; i++)
+        public void ShouldMatchFindings(ExpectedCodeSmellFinding[] expected)
         {
-            var actualFinding = actual[i];
-            var expectedFinding = expected[i];
+            actual.Count.Is(expected.Length);
 
-            actualFinding.Location.Line.Is(expectedFinding.Line);
-            actualFinding.Location.Column.Is(expectedFinding.Column);
-            actualFinding.Title.Is(expectedFinding.Title);
-            actualFinding.Category.Is(expectedFinding.Category);
-            actualFinding.RiskLevel.Is(expectedFinding.RiskLevel);
+            for (var i = 0; i < expected.Length; i++)
+            {
+                var actualFinding = actual[i];
+                var expectedFinding = expected[i];
+
+                actualFinding.Location.Line.Is(expectedFinding.Line);
+                actualFinding.Location.Column.Is(expectedFinding.Column);
+                actualFinding.Title.Is(expectedFinding.Title);
+                actualFinding.Category.Is(expectedFinding.Category);
+                actualFinding.RiskLevel.Is(expectedFinding.RiskLevel);
+            }
         }
     }
 }

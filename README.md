@@ -140,17 +140,17 @@ Parameters:
 
 ### `resolve_symbol`
 
-Use this tool when you have a location in source code (file path + line + column) or a qualified name and you need to obtain a stable `symbolId` that can be used by other navigation tools. This is often the first step before calling `explain_symbol`, `trace_call_flow`, or `find_usages`.
+Use this tool when you have a source position (`path` + `line` + `column`), a qualified symbol name, or an existing `symbolId` and need the stable `symbolId` plus declaration location used by other navigation tools. This is often the first step before calling `explain_symbol`, `trace_call_flow`, or `find_usages`. Qualified-name lookup can search the whole loaded solution, but project selectors help disambiguate short names or duplicate symbols across projects.
 
 Parameters:
 - `symbolId` (optional): An existing symbol ID to look up. Provide this OR `path`+`line`+`column` OR `qualifiedName`.
 - `path` (optional): Path to a source file. Provide this together with `line` and `column` instead of `symbolId` or `qualifiedName`.
 - `line` (optional): Line number (1-based) in the source file.
 - `column` (optional): Column number (1-based) in the source file.
-- `qualifiedName` (optional): A fully qualified or short type/member name (e.g., `System.String` or `MyClass.MyMethod`). Provide this instead of `symbolId` or `path`+`line`+`column`.
-- `projectPath` (optional): Required when using `qualifiedName` — path to a project that contains the symbol.
-- `projectName` (optional): Required when using `qualifiedName` — name of a project that contains the symbol.
-- `projectId` (optional): Required when using `qualifiedName` — project ID from `load_solution` that contains the symbol.
+- `qualifiedName` (optional): A fully qualified or short type/member name (e.g., `System.String`, `MyNamespace.MyType.MyMethod`, or `MyMethod`). Provide this instead of `symbolId` or `path`+`line`+`column`.
+- `projectPath` (optional): Optional project scope for `qualifiedName` lookup — path to a project that contains the symbol. Use this to narrow ambiguous matches.
+- `projectName` (optional): Optional project scope for `qualifiedName` lookup — name of a project that contains the symbol. Use this to narrow ambiguous matches.
+- `projectId` (optional): Optional project scope for `qualifiedName` lookup — project ID from `load_solution` that contains the symbol. Use this to narrow ambiguous matches.
 
 
 ### `explain_symbol`
