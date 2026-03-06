@@ -86,8 +86,12 @@ public static class ToolContractMapperExtensions
                 NormalizeOptionalString(direction)?.ToLowerInvariant(),
                 NormalizeNonNegative(depth));
 
-        public FindCodeSmellsRequest ToFindCodeSmellsRequest()
-            => new(NormalizeString(solutionHintPath));
+        public FindCodeSmellsRequest ToFindCodeSmellsRequest(int? maxFindings, IReadOnlyList<string>? riskLevels, IReadOnlyList<string>? categories)
+            => new(
+                NormalizeString(solutionHintPath),
+                maxFindings,
+                NormalizeOptionalStrings(riskLevels),
+                NormalizeOptionalStrings(categories));
 
         public ListDependenciesRequest ToListDependenciesRequest(string? projectName,
             string? projectId,
@@ -122,6 +126,22 @@ public static class ToolContractMapperExtensions
 
     private static string? NormalizeOptionalString(string? input)
         => string.IsNullOrWhiteSpace(input) ? null : input.Trim();
+
+    private static IReadOnlyList<string>? NormalizeOptionalStrings(IReadOnlyList<string>? values)
+    {
+        if (values is null)
+        {
+            return null;
+        }
+
+        var normalized = values
+            .Select(NormalizeOptionalString)
+            .Where(static value => value is not null)
+            .Cast<string>()
+            .ToArray();
+
+        return normalized.Length == 0 ? Array.Empty<string>() : normalized;
+    }
 
     private static string NormalizeString(string? input)
         => string.IsNullOrWhiteSpace(input) ? string.Empty : input.Trim();

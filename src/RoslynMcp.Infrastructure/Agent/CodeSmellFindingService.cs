@@ -12,7 +12,6 @@ namespace RoslynMcp.Infrastructure.Agent;
 public sealed class CodeSmellFindingService : ICodeSmellFindingService
 {
     private const int MaximumScannedAnchors = 500;
-
     private readonly IRoslynSolutionAccessor _solutionAccessor;
     private readonly IRefactoringService _refactoringService;
     private readonly RoslynatorAnalyzerCatalog _analyzerCatalog;
@@ -27,13 +26,15 @@ public sealed class CodeSmellFindingService : ICodeSmellFindingService
     public async Task<FindCodeSmellsResult> FindCodeSmellsAsync(FindCodeSmellsRequest request, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(request);
+        ct.ThrowIfCancellationRequested();
 
-        var path = NormalizePath(request.Path);
-
-        if (path is null)
+        var (filters, validationError) = ValidateRequest(request);
+        if (validationError is not null)
         {
-            return CreateInvalidInputResult("path is required.", ("field", "path"));
+            return validationError;
         }
+
+        var path = filters!.Path;
 
         var (solution, solutionError) = await _solutionAccessor.GetCurrentSolutionAsync(ct).ConfigureAwait(false);
         if (solution is null)
@@ -77,10 +78,12 @@ public sealed class CodeSmellFindingService : ICodeSmellFindingService
 
         var warnings = new List<string>();
         var anchors = await CollectAnchorsAsync(document, warnings, ct).ConfigureAwait(false);
-        var actions = new List<RankedAction>();
+        var actions = new List<CodeSmellMatch>();
 
         foreach (var anchor in anchors)
         {
+            ct.ThrowIfCancellationRequested();
+
             var discovered = await _refactoringService.GetRefactoringsAtPositionAsync(
                 new GetRefactoringsAtPositionRequest(anchor.FilePath, anchor.Line, anchor.Column, null, null, "default"),
                 ct).ConfigureAwait(false);
@@ -123,39 +126,33 @@ public sealed class CodeSmellFindingService : ICodeSmellFindingService
 
             foreach (var action in actionsAtAnchor)
             {
-                actions.Add(new RankedAction(
-                    new CodeSmellMatch(
-                        action.Title,
-                        action.Category,
-                        new SourceLocation(anchor.FilePath, anchor.Line, anchor.Column),
-                        action.Origin,
-                        action.RiskLevel),
-                    anchor.IsDiagnostic ? 0 : 1,
-                    string.Equals(action.PolicyDecision.Decision, "allow", StringComparison.Ordinal) ? 0 : 1,
-                    MapRisk(action.RiskLevel)));
+                var match = new CodeSmellMatch(
+                    action.Title,
+                    action.Category,
+                    new SourceLocation(anchor.FilePath, anchor.Line, anchor.Column),
+                    action.Origin,
+                    action.RiskLevel);
+
+                if (!filters.Accepts(match))
+                {
+                    continue;
+                }
+
+                actions.Add(match);
+
+                if (filters.HasReachedLimit(actions.Count))
+                {
+                    return new FindCodeSmellsResult(actions.ToArray(), warnings);
+                }
             }
         }
 
-        var orderedActions = actions
-            .OrderBy(static action => action.AnchorPriority)
-            .ThenBy(static action => action.PolicyPriority)
-            .ThenBy(static action => action.RiskPriority)
-            .ThenBy(static action => action.Action.Location.FilePath, StringComparer.Ordinal)
-            .ThenBy(static action => action.Action.Location.Line)
-            .ThenBy(static action => action.Action.Location.Column)
-            .ThenBy(static action => action.Action.Title, StringComparer.Ordinal)
-            .ThenBy(static action => action.Action.Category, StringComparer.Ordinal)
-            .ThenBy(static action => action.Action.Origin, StringComparer.Ordinal)
-            .ThenBy(static action => action.Action.RiskLevel, StringComparer.Ordinal)
-            .Select(static action => action.Action)
-            .ToArray();
-
-        return new FindCodeSmellsResult(orderedActions, warnings);
+        return new FindCodeSmellsResult(actions.ToArray(), warnings);
     }
 
     private async Task<IReadOnlyList<AnchorPosition>> CollectAnchorsAsync(Document document, List<string> warnings, CancellationToken ct)
     {
-        var anchors = new List<AnchorPosition>();
+        var declarationAnchors = new List<AnchorPosition>();
 
         if (document.SupportsSyntaxTree)
         {
@@ -166,18 +163,23 @@ public sealed class CodeSmellFindingService : ICodeSmellFindingService
             }
             else
             {
-                anchors.AddRange(EnumerateDeclarationAnchors(syntaxRoot, document.FilePath));
+                declarationAnchors.AddRange(EnumerateDeclarationAnchors(syntaxRoot, document.FilePath));
             }
         }
 
-        anchors.AddRange(await EnumerateDiagnosticAnchorsAsync(document, ct).ConfigureAwait(false));
+        var diagnosticAnchors = await EnumerateDiagnosticAnchorsAsync(document, ct).ConfigureAwait(false);
 
-        var ordered = anchors
+        var ordered = diagnosticAnchors
             .OrderBy(static anchor => anchor.FilePath, StringComparer.Ordinal)
             .ThenBy(static anchor => anchor.Line)
             .ThenBy(static anchor => anchor.Column)
-            .ThenByDescending(static anchor => anchor.IsDiagnostic)
             .ThenBy(static anchor => anchor.AnchorKind, StringComparer.Ordinal)
+            .Concat(
+                declarationAnchors
+                    .OrderBy(static anchor => anchor.FilePath, StringComparer.Ordinal)
+                    .ThenBy(static anchor => anchor.Line)
+                    .ThenBy(static anchor => anchor.Column)
+                    .ThenBy(static anchor => anchor.AnchorKind, StringComparer.Ordinal))
             .ToArray();
 
         var deduplicated = new List<AnchorPosition>(ordered.Length);
@@ -297,9 +299,13 @@ public sealed class CodeSmellFindingService : ICodeSmellFindingService
                 anchors.Add(CreateDiagnosticAnchor(diagnostic));
             }
         }
-        catch (Exception)
+        catch (OperationCanceledException)
         {
-            // If analyzer diagnostics fail, just continue with compiler diagnostics
+            throw;
+        }
+        catch (Exception exception)
+        {
+            _ = exception;
         }
 
         return anchors;
@@ -324,8 +330,92 @@ public sealed class CodeSmellFindingService : ICodeSmellFindingService
     private static FindCodeSmellsResult CreateInvalidInputResult(string message, params (string Key, string? Value)[] details)
         => new(Array.Empty<CodeSmellMatch>(), Array.Empty<string>(), AgentErrorInfo.Create(ErrorCodes.InvalidInput, message, "Adjust input and retry find_codesmells.", details));
 
+    private static (FindCodeSmellFilters? Filters, FindCodeSmellsResult? Error) ValidateRequest(FindCodeSmellsRequest request)
+    {
+        var path = NormalizePath(request.Path);
+        if (path is null)
+        {
+            return defaultError(CreateInvalidInputResult("path is required.", ("field", "path")));
+        }
+
+        if (request.MaxFindings is <= 0)
+        {
+            return defaultError(CreateInvalidInputResult(
+                "maxFindings must be greater than 0 when provided.",
+                ("field", "maxFindings"),
+                ("provided", request.MaxFindings.Value.ToString(System.Globalization.CultureInfo.InvariantCulture))));
+        }
+
+        var (riskLevels, riskError) = NormalizeRiskLevels(request.RiskLevels);
+        if (riskError is not null)
+        {
+            return defaultError(riskError);
+        }
+
+        var (categories, categoryError) = NormalizeCategories(request.Categories);
+        if (categoryError is not null)
+        {
+            return defaultError(categoryError);
+        }
+
+        return (new FindCodeSmellFilters(path, request.MaxFindings, riskLevels, categories), null);
+
+        static (FindCodeSmellFilters? Filters, FindCodeSmellsResult Error) defaultError(FindCodeSmellsResult error)
+            => (default, error);
+    }
+
     private static string? NormalizePath(string? path)
         => string.IsNullOrWhiteSpace(path) ? null : path.Trim();
+
+    private static (HashSet<string>? RiskLevels, FindCodeSmellsResult? Error) NormalizeRiskLevels(IReadOnlyList<string>? riskLevels)
+    {
+        if (riskLevels is null || riskLevels.Count == 0)
+        {
+            return (null, null);
+        }
+
+        var normalized = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var riskLevel in riskLevels)
+        {
+            var normalizedRiskLevel = NormalizePath(riskLevel);
+            if (normalizedRiskLevel is null)
+            {
+                return (null, CreateInvalidInputResult(
+                    "riskLevels must contain non-empty values.",
+                    ("field", "riskLevels")));
+            }
+
+            normalized.Add(normalizedRiskLevel);
+        }
+
+        return (normalized, null);
+    }
+
+    private static (HashSet<string>? Categories, FindCodeSmellsResult? Error) NormalizeCategories(IReadOnlyList<string>? categories)
+    {
+        if (categories is null || categories.Count == 0)
+        {
+            return (null, null);
+        }
+
+        var normalized = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var category in categories)
+        {
+            var normalizedCategory = NormalizePath(category);
+            if (normalizedCategory is null)
+            {
+                return (null, CreateInvalidInputResult(
+                    "categories must contain non-empty values.",
+                    ("field", "categories")));
+            }
+
+            normalized.Add(normalizedCategory);
+        }
+
+        return (normalized, null);
+    }
 
     private static string CreateAnchorDeduplicationKey(string path, int line, int column)
         => string.Join('|', NormalizePathForDeduplication(path), line, column);
@@ -354,9 +444,28 @@ public sealed class CodeSmellFindingService : ICodeSmellFindingService
 
     private sealed record AnchorPosition(string FilePath, int Line, int Column, string AnchorKind, bool IsDiagnostic);
 
-    private sealed record RankedAction(
-        CodeSmellMatch Action,
-        int AnchorPriority,
-        int PolicyPriority,
-        RiskLevel RiskPriority);
+    private sealed record FindCodeSmellFilters(
+        string Path,
+        int? MaxFindings,
+        HashSet<string>? RiskLevels,
+        HashSet<string>? Categories)
+    {
+        public bool Accepts(CodeSmellMatch match)
+        {
+            if (RiskLevels is not null && !RiskLevels.Contains(match.RiskLevel))
+            {
+                return false;
+            }
+
+            if (Categories is not null && !Categories.Contains(match.Category))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        public bool HasReachedLimit(int acceptedCount)
+            => MaxFindings is not null && acceptedCount >= MaxFindings.Value;
+    }
 }

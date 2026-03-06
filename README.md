@@ -206,8 +206,11 @@ Parameters:
 
 ### `find_codesmells`
 
-Use this tool when you need to check a specific file for potential code quality issues. It runs Roslyn-based static analysis to detect common problems such as dead code, performance anti-patterns, naming violations, and other code smells identified by Roslynator analyzers.
+Use this tool when you need to check a specific file for potential code quality issues. It runs Roslyn-based static analysis to detect common problems such as dead code, performance anti-patterns, naming violations, and other code smells identified by Roslynator analyzers. Results are returned in deterministic stream order, with diagnostic anchors evaluated before declaration anchors.
 
 Parameters:
 - `path` (required): Path to the source file to analyze. The file must exist in the currently loaded solution.
+- `maxFindings` (optional): Maximum number of accepted findings to return. Discovery stops as soon as this many matching findings are found.
+- `riskLevels` (optional): Accepted risk levels to include. Use values returned in `find_codesmells` results, such as `safe`, `review_required`, `high`, `low`, `medium`, or `info`.
+- `categories` (optional): Accepted categories to include. Empty or omitted means all categories are included.
 

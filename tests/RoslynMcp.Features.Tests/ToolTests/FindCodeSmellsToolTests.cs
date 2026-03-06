@@ -1,4 +1,3 @@
-using Is.Assertions;
 using RoslynMcp.Core;
 using RoslynMcp.Features.Tools;
 using Xunit;
@@ -6,26 +5,53 @@ using Xunit.Abstractions;
 
 namespace RoslynMcp.Features.Tests.ToolTests;
 
+public sealed record ExpectedCodeSmellFinding(int Line, int Column, string Title, string Category, string RiskLevel);
+
 public sealed class FindCodeSmellsToolTests(FeatureTestsFixture fixture, ITestOutputHelper output)
     : ToolTests<FindCodeSmellsTool>(fixture, output)
 {
+    private string CodeSmellsPath => Path.Combine(Path.GetDirectoryName(Fixture.SolutionPath)!, "ProjectImpl", "CodeSmells.cs");
+
     [Fact]
-    public async Task FindCodeSmellsAsync_WithSolutionFilePath_ReturnsSmellActions()
+    public async Task FindCodeSmellsAsync_WithNoOptionalFilters_PreservesCompatibility()
     {
-        var path = Path.Combine(Path.GetDirectoryName(Fixture.SolutionPath)!, "ProjectImpl", "CodeSmells.cs");
-        var result = await Sut.ExecuteAsync(CancellationToken.None, path);
+        var result = await Sut.ExecuteAsync(CancellationToken.None, CodeSmellsPath);
 
-        foreach (var item in result.Actions)
-            Trace($"{item.Location.Line}|{item.Location.Column}: {item.Title}");
-        
         result.Error.ShouldBeNone();
-        result.Actions.Count.Is(21);
-        
-        var titles = result.Actions.Select(action => action.Title).ToArray();
+        result.Actions.ShouldMatchFindings(BaselineFindings);
+    }
 
-        titles.Any(title => title.Contains("RCS1163")).IsTrue();
-        titles.Any(title => title.Contains("Parenthesize")).IsTrue();
-        titles.Any(title => title.Contains("Remove")).IsTrue();
+    [Fact]
+    public async Task FindCodeSmellsAsync_WithMaxFindings_LimitsReturnedResults()
+    {
+        var limited = await Sut.ExecuteAsync(CancellationToken.None, CodeSmellsPath, maxFindings: 3);
+
+        limited.Error.ShouldBeNone();
+        limited.Actions.ShouldMatchFindings(BaselineFindings[..3]);
+    }
+
+    [Fact]
+    public async Task FindCodeSmellsAsync_WithRiskLevels_FiltersAcceptedFindings()
+    {
+        var filtered = await Sut.ExecuteAsync(
+            CancellationToken.None,
+            CodeSmellsPath,
+            riskLevels: ["blocked"]);
+
+        filtered.Error.ShouldBeNone();
+        filtered.Actions.ShouldMatchFindings(BlockedFindings);
+    }
+
+    [Fact]
+    public async Task FindCodeSmellsAsync_WithCategories_FiltersAcceptedFindings()
+    {
+        var filtered = await Sut.ExecuteAsync(
+            CancellationToken.None,
+            CodeSmellsPath,
+            categories: ["analyzer"]);
+
+        filtered.Error.ShouldBeNone();
+        filtered.Actions.ShouldMatchFindings(AnalyzerFindings);
     }
 
     [Fact]
@@ -35,4 +61,66 @@ public sealed class FindCodeSmellsToolTests(FeatureTestsFixture fixture, ITestOu
 
         result.Error.ShouldHaveCode(ErrorCodes.InvalidInput);
     }
+
+    [Fact]
+    public async Task FindCodeSmellsAsync_WithInvalidMaxFindings_ReturnsValidationError()
+    {
+        var result = await Sut.ExecuteAsync(CancellationToken.None, CodeSmellsPath, maxFindings: 0);
+
+        result.Error.ShouldHaveCode(ErrorCodes.InvalidInput);
+    }
+    
+    private static readonly ExpectedCodeSmellFinding[] BaselineFindings =
+    [
+        new(7, 5, "Convert comment to documentation comment", "roslynator", "blocked"),
+        new(8, 30, "Remove '_unusedField'", "roslynator", "blocked"),
+        new(9, 1, "Remove trailing white-space", "roslynator", "blocked"),
+        new(10, 5, "Convert comment to documentation comment", "roslynator", "blocked"),
+        new(21, 1, "Remove trailing white-space", "roslynator", "blocked"),
+        new(22, 5, "Convert comment to documentation comment", "roslynator", "blocked"),
+        new(25, 16, "Parenthesize 'value * 42'", "roslynator", "blocked"),
+        new(27, 1, "Remove trailing white-space", "roslynator", "blocked"),
+        new(28, 5, "Convert comment to documentation comment", "roslynator", "blocked"),
+        new(29, 29, "Diagnostic: RCS1163", "analyzer", "info"),
+        new(29, 36, "Diagnostic: RCS1163", "analyzer", "info"),
+        new(29, 43, "Diagnostic: RCS1163", "analyzer", "info"),
+        new(29, 50, "Diagnostic: RCS1163", "analyzer", "info"),
+        new(29, 57, "Diagnostic: RCS1163", "analyzer", "info"),
+        new(29, 64, "Diagnostic: RCS1163", "analyzer", "info"),
+        new(32, 1, "Remove trailing white-space", "roslynator", "blocked"),
+        new(33, 5, "Convert comment to documentation comment", "roslynator", "blocked"),
+        new(37, 9, "Diagnostic: CS0162", "analyzer", "info"),
+        new(39, 1, "Remove trailing white-space", "roslynator", "blocked"),
+        new(40, 5, "Convert comment to documentation comment", "roslynator", "blocked"),
+        new(25, 24, "Parenthesize 'value * 42'", "roslynator", "blocked")
+    ];
+
+    private static readonly ExpectedCodeSmellFinding[] AnalyzerFindings =
+    [
+        new(29, 29, "Diagnostic: RCS1163", "analyzer", "info"),
+        new(29, 36, "Diagnostic: RCS1163", "analyzer", "info"),
+        new(29, 43, "Diagnostic: RCS1163", "analyzer", "info"),
+        new(29, 50, "Diagnostic: RCS1163", "analyzer", "info"),
+        new(29, 57, "Diagnostic: RCS1163", "analyzer", "info"),
+        new(29, 64, "Diagnostic: RCS1163", "analyzer", "info"),
+        new(37, 9, "Diagnostic: CS0162", "analyzer", "info")
+    ];
+
+    private static readonly ExpectedCodeSmellFinding[] BlockedFindings =
+    [
+        new(7, 5, "Convert comment to documentation comment", "roslynator", "blocked"),
+        new(8, 30, "Remove '_unusedField'", "roslynator", "blocked"),
+        new(9, 1, "Remove trailing white-space", "roslynator", "blocked"),
+        new(10, 5, "Convert comment to documentation comment", "roslynator", "blocked"),
+        new(21, 1, "Remove trailing white-space", "roslynator", "blocked"),
+        new(22, 5, "Convert comment to documentation comment", "roslynator", "blocked"),
+        new(25, 16, "Parenthesize 'value * 42'", "roslynator", "blocked"),
+        new(27, 1, "Remove trailing white-space", "roslynator", "blocked"),
+        new(28, 5, "Convert comment to documentation comment", "roslynator", "blocked"),
+        new(32, 1, "Remove trailing white-space", "roslynator", "blocked"),
+        new(33, 5, "Convert comment to documentation comment", "roslynator", "blocked"),
+        new(39, 1, "Remove trailing white-space", "roslynator", "blocked"),
+        new(40, 5, "Convert comment to documentation comment", "roslynator", "blocked"),
+        new(25, 24, "Parenthesize 'value * 42'", "roslynator", "blocked")
+    ];
 }

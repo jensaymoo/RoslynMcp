@@ -178,7 +178,10 @@ public sealed record TraceFlowResult(
     ErrorInfo? Error = null);
 
 public sealed record FindCodeSmellsRequest(
-    string Path);
+    string Path,
+    int? MaxFindings = null,
+    IReadOnlyList<string>? RiskLevels = null,
+    IReadOnlyList<string>? Categories = null);
 
 public sealed record CodeSmellMatch(
     string Title,
