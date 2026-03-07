@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="UTF-8" ?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
     <ItemGroup>
         <ProjectReference Include="..\RoslynMcp.Core\RoslynMcp.Core.csproj" />
@@ -27,7 +27,7 @@
         <PackageId>RoslynMcp</PackageId>
         <PackAsTool>true</PackAsTool>
         <ToolCommandName>roslynmcp</ToolCommandName>
-        <Version>0.4.0</Version>
+        <Version>0.4.1</Version>
         <Authors>chrismo80</Authors>
         <Description>Roslyn-based MCP server for semantic C# analysis.</Description>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
