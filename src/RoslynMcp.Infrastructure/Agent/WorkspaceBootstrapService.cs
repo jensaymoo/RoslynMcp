@@ -68,7 +68,7 @@ public sealed class WorkspaceBootstrapService : IWorkspaceBootstrapService
             .ToArray();
 
         var baseline = await _analysisService.AnalyzeScopeAsync(new AnalyzeScopeRequest(AnalysisScopes.Solution), ct).ConfigureAwait(false);
-        var diagnostics = baseline.Diagnostics.ToDiagnosticsSummary();
+        var diagnostics = baseline.Diagnostics.ToLoadBaselineDiagnosticsSummary();
 
         var (workspaceVersion, versionError) = await _solutionAccessor.GetWorkspaceVersionAsync(ct).ConfigureAwait(false);
         if (versionError != null)

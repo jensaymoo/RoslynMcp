@@ -1,6 +1,7 @@
 using Is.Assertions;
 using RoslynMcp.Core;
 using RoslynMcp.Core.Models;
+using RoslynMcp.Features.Tests.Mutations;
 using RoslynMcp.Features.Tools;
 using Xunit;
 using Xunit.Abstractions;
@@ -28,7 +29,7 @@ public sealed class TraceCallFlowToolTests(SharedSandboxFixture fixture, ITestOu
         result.RootSymbol.Kind.Is("Method");
         result.Direction.Is("downstream");
         result.Depth.Is(2);
-        result.Edges.Count.Is(10);
+        result.Edges.Count.Is(9);
 
         AssertEdge(result.Edges, runAsync.Symbol.SymbolId, startAsync.Symbol!.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 20);
         AssertEdge(result.Edges, runAsync.Symbol.SymbolId, executeFlowAsync.Symbol!.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 23);
@@ -121,6 +122,31 @@ public sealed class TraceCallFlowToolTests(SharedSandboxFixture fixture, ITestOu
     }
 
     [Fact]
+    public async Task TraceFlowAsync_WithReflectionHeavyMethod_FiltersFrameworkOnlyNoiseByDefault()
+    {
+        var result = await Sut.ExecuteAsync(CancellationToken.None, path: AppOrchestratorPath, line: 34, column: 41, direction: "downstream", depth: 1);
+
+        result.Error.ShouldBeNone();
+        result.RootSymbol.IsNotNull();
+        result.RootSymbol!.Name.Is("RunReflectionPathAsync");
+        result.Edges.Count.Is(0);
+        result.Transitions.Count.Is(0);
+    }
+
+    [Fact]
+    public async Task TraceFlowAsync_WithGeneratedRootSymbol_FiltersGeneratedEdgesByDefault()
+    {
+        var generatedPath = Path.Combine(TestSolutionDirectory, "ProjectApp", "obj", "Debug", "net10.0", "GeneratedExecutionHooks.g.cs");
+        var result = await Sut.ExecuteAsync(CancellationToken.None, path: generatedPath, line: 8, column: 24, direction: "downstream", depth: 1);
+
+        result.Error.ShouldBeNone();
+        result.RootSymbol.IsNotNull();
+        result.RootSymbol!.Name.Is("BeforeRun");
+        result.Edges.Count.Is(0);
+        result.Transitions.Count.Is(0);
+    }
+
+    [Fact]
     public async Task TraceFlowAsync_WithInvalidDirection_ReturnsValidationError()
     {
         var result = await Sut.ExecuteAsync(CancellationToken.None, symbolId: "symbol-id", direction: "sideways");
@@ -176,4 +202,46 @@ public sealed class TraceCallFlowToolTests(SharedSandboxFixture fixture, ITestOu
     }
 
     private sealed record ResolvedSymbolSummaryResult(ResolvedSymbolSummary Symbol);
+}
+
+public sealed class TraceCallFlowToolIsolatedTests(ITestOutputHelper output)
+    : IsolatedToolTests<TraceCallFlowTool>(output)
+{
+    [Fact]
+    public async Task TraceFlowAsync_ExcludesTestFileCallersFromDefaultResults()
+    {
+        await using var context = await CreateContextAsync();
+        var traceTool = GetSut(context);
+        var resolveTool = context.GetRequiredService<ResolveSymbolTool>();
+        var loadSolution = context.GetRequiredService<LoadSolutionTool>();
+        var testFilePath = Path.Combine(context.TestSolutionDirectory, "ProjectApp", "RunAsyncTests.cs");
+
+        await File.WriteAllTextAsync(testFilePath, """
+using ProjectCore;
+using ProjectImpl;
+
+namespace ProjectApp;
+
+public static class RunAsyncTests
+{
+    public static Task<OperationResult> ExecuteAsync(CancellationToken cancellationToken = default)
+        => new AppOrchestrator(new FastWorkItemOperation()).RunAsync(cancellationToken);
+}
+""", CancellationToken.None);
+
+        var load = await loadSolution.ExecuteAsync(CancellationToken.None, context.SolutionPath);
+
+        load.Error.ShouldBeNone();
+
+        var runAsync = await resolveTool.ExecuteAsync(CancellationToken.None, path: Path.Combine(context.TestSolutionDirectory, "ProjectApp", "AppOrchestrator.cs"), line: 15, column: 44);
+
+        runAsync.Error.ShouldBeNone();
+        runAsync.Symbol.IsNotNull();
+
+        var result = await traceTool.ExecuteAsync(CancellationToken.None, symbolId: runAsync.Symbol!.SymbolId, direction: "upstream", depth: 1);
+
+        result.Error.ShouldBeNone();
+        result.Edges.Count.Is(2);
+        result.Edges.Any(edge => edge.Location.FilePath.HasPathSuffix(Path.Combine("ProjectApp", "RunAsyncTests.cs"))).IsFalse();
+    }
 }

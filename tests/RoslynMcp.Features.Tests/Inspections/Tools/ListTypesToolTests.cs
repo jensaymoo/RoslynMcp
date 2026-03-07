@@ -1,6 +1,7 @@
 using Is.Assertions;
 using RoslynMcp.Core;
 using RoslynMcp.Core.Models;
+using RoslynMcp.Features.Tests.Mutations;
 using RoslynMcp.Features.Tools;
 using RoslynMcp.Infrastructure.Workspace;
 using Xunit;
@@ -117,7 +118,6 @@ public sealed class ListTypesToolTests(SharedSandboxFixture fixture, ITestOutput
         result.Types.Count.Is(0);
         result.Error!.Details!["projectIdScope"].Is("snapshot-local");
     }
-
     private async Task<string> GetProjectIdAsync(string projectName)
     {
         var accessor = Context.GetRequiredService<IRoslynSolutionAccessor>();
@@ -143,5 +143,46 @@ internal static class ListTypesToolTestAssertions
     {
         result.Error.ShouldHaveCode(expectedCode);
         result.Error!.Message.Is(expectedMessage);
+    }
+}
+
+public sealed class ListTypesToolIsolatedTests(ITestOutputHelper output)
+    : IsolatedToolTests<ListTypesTool>(output)
+{
+    [Fact]
+    public async Task ListTypesAsync_WithGeneratedOnlyProject_FallsBackToGeneratedSourceTypes()
+    {
+        await using var context = await CreateContextAsync();
+        var sut = GetSut(context);
+        var loadSolution = context.GetRequiredService<LoadSolutionTool>();
+        var projectFilePath = Path.Combine(context.TestSolutionDirectory, "ProjectApp", "ProjectApp.csproj");
+
+        await File.WriteAllTextAsync(projectFilePath, """
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="obj\Debug\net10.0\GeneratedExecutionHooks.g.cs" />
+    <ProjectReference Include="..\ProjectCore\ProjectCore.csproj" />
+  </ItemGroup>
+
+</Project>
+""", CancellationToken.None);
+
+        var load = await loadSolution.ExecuteAsync(CancellationToken.None, context.SolutionPath);
+
+        load.Error.ShouldBeNone();
+
+        var result = await sut.ExecuteAsync(CancellationToken.None, projectName: "ProjectApp");
+
+        result.Error.ShouldBeNone();
+        result.TotalCount.Is(1);
+        result.Types.Select(static type => type.DisplayName).Is("GeneratedExecutionHooks");
     }
 }

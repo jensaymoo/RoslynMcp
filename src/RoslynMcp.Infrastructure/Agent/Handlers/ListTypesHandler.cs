@@ -72,6 +72,7 @@ internal sealed class ListTypesHandler
 
         var namespacePrefix = request.NamespacePrefix.NormalizeOptional();
         var entries = new List<TypeListEntry>();
+        var generatedFallbackEntries = new List<TypeListEntry>();
 
         foreach (var project in selectedProjects)
         {
@@ -112,12 +113,7 @@ internal sealed class ListTypesHandler
                 }
 
                 var (filePath, line, column) = type.GetDeclarationPosition();
-                if (!SourceVisibility.ShouldIncludeInHumanResults(filePath))
-                {
-                    continue;
-                }
-
-                entries.Add(new TypeListEntry(
+                var entry = new TypeListEntry(
                     type.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
                     SymbolIdentity.CreateId(type),
                     filePath,
@@ -125,8 +121,21 @@ internal sealed class ListTypesHandler
                     column,
                     kind,
                     type.IsPartial(),
-                    type.Arity > 0 ? type.Arity : null));
+                    type.Arity > 0 ? type.Arity : null);
+
+                if (!SourceVisibility.ShouldIncludeInHumanResults(filePath))
+                {
+                    generatedFallbackEntries.Add(entry);
+                    continue;
+                }
+
+                entries.Add(entry);
             }
+        }
+
+        if (entries.Count == 0 && generatedFallbackEntries.Count > 0)
+        {
+            entries.AddRange(generatedFallbackEntries);
         }
 
         var ordered = entries

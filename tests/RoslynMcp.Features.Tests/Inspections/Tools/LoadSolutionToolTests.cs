@@ -43,4 +43,29 @@ public sealed class LoadSolutionToolIsolatedTests(ITestOutputHelper output)
         result.Projects.Any(project => project.Name == "RoslynMcp.Features").IsTrue();
         result.Projects.Any(project => project.Name == "RoslynMcp.Infrastructure").IsTrue();
     }
+
+    [Fact]
+    public async Task LoadSolutionAsync_ExcludesGeneratedIntermediateDiagnosticsFromBaselineSummary()
+    {
+        await using var context = await CreateContextAsync();
+        var sut = GetSut(context);
+        var projectDirectory = Path.Combine(context.TestSolutionDirectory, "ProjectApp");
+        var generatedPath = Path.Combine(projectDirectory, "obj", "Debug", "net10.0", "FreshWorktreeNoise.g.cs");
+        var projectFilePath = Path.Combine(projectDirectory, "ProjectApp.csproj");
+
+        Directory.CreateDirectory(Path.GetDirectoryName(generatedPath)!);
+        await File.WriteAllTextAsync(generatedPath, "namespace ProjectApp; public static class FreshWorktreeNoise { public static void Broken( }", CancellationToken.None);
+
+        var projectFile = await File.ReadAllTextAsync(projectFilePath, CancellationToken.None);
+        projectFile = projectFile.Replace(
+            "    <Compile Include=\"obj\\Debug\\net10.0\\GeneratedExecutionHooks.g.cs\" />",
+            "    <Compile Include=\"obj\\Debug\\net10.0\\GeneratedExecutionHooks.g.cs\" />\n    <Compile Include=\"obj\\Debug\\net10.0\\FreshWorktreeNoise.g.cs\" />",
+            StringComparison.Ordinal);
+        await File.WriteAllTextAsync(projectFilePath, projectFile, CancellationToken.None);
+
+        var result = await sut.ExecuteAsync(CancellationToken.None, context.SolutionPath);
+
+        result.Error.ShouldBeNone();
+        result.BaselineDiagnostics.ErrorCount.Is(0);
+    }
 }

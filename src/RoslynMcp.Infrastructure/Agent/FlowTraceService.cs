@@ -92,7 +92,7 @@ public sealed class FlowTraceService(INavigationService navigationService, IRosl
             edges = graph.Edges;
         }
 
-        var filteredEdges = edges.Where(static edge => SourceVisibility.ShouldIncludeInHumanResults(edge.Location.FilePath)).ToArray();
+        var filteredEdges = edges.Where(static edge => SourceVisibility.ShouldIncludeInInteractiveTrace(edge.Location.FilePath)).ToArray();
         Dictionary<string, string>? symbolProjects = null;
 
         var (solution, _) = await _solutionAccessor.GetCurrentSolutionAsync(ct).ConfigureAwait(false);
@@ -179,7 +179,12 @@ public sealed class FlowTraceService(INavigationService navigationService, IRosl
 
             var normalized = symbol.OriginalDefinition ?? symbol;
             var sourcePath = normalized.Locations.FirstOrDefault(static location => location.IsInSource)?.GetLineSpan().Path;
-            if (!SourceVisibility.ShouldIncludeInHumanResults(sourcePath))
+            if (string.IsNullOrWhiteSpace(sourcePath))
+            {
+                return null;
+            }
+
+            if (!SourceVisibility.ShouldIncludeInInteractiveTrace(sourcePath))
             {
                 return null;
             }
@@ -193,8 +198,8 @@ public sealed class FlowTraceService(INavigationService navigationService, IRosl
     private static bool ShouldIncludeEdge(CallEdge edge, IReadOnlyDictionary<string, SymbolFlowFacts> symbolFacts)
         => symbolFacts.ContainsKey(edge.FromSymbolId)
            && symbolFacts.ContainsKey(edge.ToSymbolId)
-           && SourceVisibility.ShouldIncludeInHumanResults(symbolFacts[edge.FromSymbolId].DeclarationPath)
-           && SourceVisibility.ShouldIncludeInHumanResults(symbolFacts[edge.ToSymbolId].DeclarationPath);
+           && SourceVisibility.ShouldIncludeInInteractiveTrace(symbolFacts[edge.FromSymbolId].DeclarationPath)
+           && SourceVisibility.ShouldIncludeInInteractiveTrace(symbolFacts[edge.ToSymbolId].DeclarationPath);
 
     private sealed record SymbolFlowFacts(string ProjectName, string? DeclarationPath);
 }

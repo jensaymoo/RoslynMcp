@@ -1,7 +1,9 @@
 using Is.Assertions;
+using System.Reflection;
 using RoslynMcp.Core;
 using RoslynMcp.Core.Models;
 using RoslynMcp.Features.Tools;
+using RoslynMcp.Infrastructure.Agent;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -56,6 +58,28 @@ public sealed class FindCodeSmellsToolTests(SharedSandboxFixture fixture, ITestO
 
         filtered.Error.ShouldBeNone();
         ShouldMatchFindings(filtered.Actions, AnalyzerFindings);
+    }
+
+    [Fact]
+    public void FindCodeSmellsAsync_CollapsesNearbyRepeatedAddBracesSuggestions()
+    {
+        var warnings = new List<string>();
+        var matches = new[]
+        {
+            new CodeSmellMatch("Add braces", "style", new SourceLocation(CodeSmellsPath, 10, 9), "refactoring", "low"),
+            new CodeSmellMatch("Add braces", "style", new SourceLocation(CodeSmellsPath, 11, 9), "refactoring", "low"),
+            new CodeSmellMatch("Add braces", "style", new SourceLocation(CodeSmellsPath, 20, 9), "refactoring", "low")
+        };
+
+        var method = typeof(CodeSmellFindingService).GetMethod("DeduplicateMatches", BindingFlags.NonPublic | BindingFlags.Static);
+
+        method.IsNotNull();
+
+        var result = (IReadOnlyList<CodeSmellMatch>)method!
+            .Invoke(null, [matches, warnings])!;
+
+        result.Count.Is(2);
+        warnings.Any(static warning => warning.Contains("Collapsed", StringComparison.Ordinal)).IsTrue();
     }
 
     [Fact]

@@ -265,4 +265,13 @@ public static partial class CodeUnderstandingExtensions
         var info = diagnostics.Count - error - warning;
         return new DiagnosticsSummary(error, warning, info, diagnostics.Count);
     }
+
+    public static DiagnosticsSummary ToLoadBaselineDiagnosticsSummary(this IReadOnlyList<DiagnosticItem> diagnostics)
+    {
+        var filtered = diagnostics
+            .Where(static diagnostic => SourceVisibility.ClassifyPath(diagnostic.Location.FilePath) is SourceKind.HandWritten or SourceKind.Unknown)
+            .ToArray();
+
+        return filtered.ToDiagnosticsSummary();
+    }
 }

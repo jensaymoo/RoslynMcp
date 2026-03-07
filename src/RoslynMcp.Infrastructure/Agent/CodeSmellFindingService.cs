@@ -5,6 +5,7 @@ using RoslynMcp.Infrastructure.Analysis;
 using RoslynMcp.Infrastructure.Navigation;
 using RoslynMcp.Infrastructure.Workspace;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace RoslynMcp.Infrastructure.Agent;
@@ -189,7 +190,7 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var anchor in ordered)
         {
-            var key = CreateAnchorDeduplicationKey(anchor.FilePath, anchor.Line, anchor.Column);
+            var key = CreateAnchorDeduplicationKey(anchor);
             if (!seen.Add(key))
             {
                 continue;
@@ -211,10 +212,13 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
     {
         var normalizedPath = filePath ?? string.Empty;
 
-        // Collect anchors at ALL syntax nodes, not just member declarations
-        // This allows finding refactorings at any position in the code
         foreach (var node in syntaxRoot.DescendantNodes())
         {
+            if (!IsDeclarationAnchorCandidate(node))
+            {
+                continue;
+            }
+
             var lineSpan = node.GetLocation().GetLineSpan();
             var start = lineSpan.StartLinePosition;
             var anchorPath = string.IsNullOrWhiteSpace(lineSpan.Path) ? normalizedPath : lineSpan.Path;
@@ -420,8 +424,13 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
         return (normalized, null);
     }
 
-    private static string CreateAnchorDeduplicationKey(string path, int line, int column)
-        => string.Join('|', NormalizePathForDeduplication(path), line, column);
+    private static string CreateAnchorDeduplicationKey(AnchorPosition anchor)
+    {
+        var path = NormalizePathForDeduplication(anchor.FilePath);
+        return anchor.IsDiagnostic
+            ? string.Join('|', path, anchor.Line, anchor.Column, anchor.AnchorKind)
+            : string.Join('|', path, anchor.Line);
+    }
 
     private static string NormalizePathForDeduplication(string path)
     {
@@ -487,6 +496,7 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
         var deduped = new List<CodeSmellMatch>(matches.Count);
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var duplicateCount = 0;
+        var collapsedNearbyCount = 0;
 
         foreach (var match in matches
                      .OrderBy(static item => item.Location.FilePath, StringComparer.Ordinal)
@@ -510,6 +520,12 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
                 continue;
             }
 
+            if (ShouldCollapseNearbyStylisticSuggestion(deduped, match))
+            {
+                collapsedNearbyCount++;
+                continue;
+            }
+
             deduped.Add(match);
         }
 
@@ -518,8 +534,57 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
             warnings.Add($"Deduplicated {duplicateCount} repetitive findings by title/category/line.");
         }
 
+        if (collapsedNearbyCount > 0)
+        {
+            warnings.Add($"Collapsed {collapsedNearbyCount} nearby repetitive stylistic findings.");
+        }
+
         return deduped;
     }
+
+    private static bool IsDeclarationAnchorCandidate(SyntaxNode node)
+        => node is BaseTypeDeclarationSyntax
+            or DelegateDeclarationSyntax
+            or BaseMethodDeclarationSyntax
+            or PropertyDeclarationSyntax
+            or EventDeclarationSyntax
+            or EventFieldDeclarationSyntax
+            or FieldDeclarationSyntax
+            or LocalFunctionStatementSyntax
+            or IfStatementSyntax
+            or ElseClauseSyntax
+            or ForStatementSyntax
+            or ForEachStatementSyntax
+            or ForEachVariableStatementSyntax
+            or WhileStatementSyntax
+            or DoStatementSyntax
+            or UsingStatementSyntax
+            or LockStatementSyntax
+            or SwitchStatementSyntax
+            or TryStatementSyntax
+            or CatchClauseSyntax;
+
+    private static bool ShouldCollapseNearbyStylisticSuggestion(IReadOnlyList<CodeSmellMatch> accepted, CodeSmellMatch candidate)
+    {
+        if (!IsNearbyStylisticSuggestion(candidate))
+        {
+            return false;
+        }
+
+        var previous = accepted.LastOrDefault();
+        return previous is not null
+               && IsNearbyStylisticSuggestion(previous)
+               && previous.Location.FilePath.MatchesByNormalizedPath(candidate.Location.FilePath)
+               && string.Equals(previous.Title, candidate.Title, StringComparison.OrdinalIgnoreCase)
+               && string.Equals(previous.Category, candidate.Category, StringComparison.OrdinalIgnoreCase)
+               && string.Equals(previous.Origin, candidate.Origin, StringComparison.OrdinalIgnoreCase)
+               && string.Equals(previous.RiskLevel, candidate.RiskLevel, StringComparison.OrdinalIgnoreCase)
+               && Math.Abs(previous.Location.Line - candidate.Location.Line) <= 1;
+    }
+
+    private static bool IsNearbyStylisticSuggestion(CodeSmellMatch match)
+        => string.Equals(match.Title, "Add braces", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(match.Title, "Remove braces", StringComparison.OrdinalIgnoreCase);
 
     private sealed record AnchorPosition(string FilePath, int Line, int Column, string AnchorKind, bool IsDiagnostic);
 
