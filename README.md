@@ -56,26 +56,27 @@ Traditional AI code assistants often rely on simplistic pattern matching (grep/g
 
 ## What You Can Use It For
 
-| Inspection Tool          | Description                                                       |
-|--------------------------|-------------------------------------------------------------------|
-| **Load Solution**        | Loads a .sln/.slnx file and prepare the workspace                 |
-| **Understand Codebase**  | Quick orientation with complexity hotspots                        |
-| **List Dependencies**    | Understand project relationships                                  |
-| **List Types**           | Discover all classes, interfaces, enums in a project              |
-| **List Members**         | Explore methods, properties, fields of any type                   |
-| **Resolve Symbol**       | Get canonical IDs for a single code symbol                        |
-| **Resolve Symbols**      | Resolve multiple symbols in one round-trip                        |
-| **Explain Symbol**       | Understand what a symbol does and where it's used                 |
-| **Trace Call Flow**      | See upstream callers or downstream callees                        |
-| **Find Callers**         | Return only immediate direct upstream callers                     |
-| **Find Usages**          | Locate all references to a type/member                            |
+| Inspection Tool          | Description                                                        |
+| ------------------------ | ------------------------------------------------------------------ |
+| **Load Solution**        | Loads a .sln/.slnx file and prepare the workspace                  |
+| **Understand Codebase**  | Quick orientation with complexity hotspots                         |
+| **List Dependencies**    | Understand project relationships                                   |
+| **List Types**           | Discover all classes, interfaces, enums in a project               |
+| **List Members**         | Explore methods, properties, fields of any type                    |
+| **Resolve Symbol**       | Get canonical IDs for a single code symbol                         |
+| **Resolve Symbols**      | Resolve multiple symbols in one round-trip                         |
+| **Explain Symbol**       | Understand what a symbol does and where it's used                  |
+| **Trace Call Flow**      | See upstream callers or downstream callees                         |
+| **Find Callers**         | Return only immediate direct upstream callers                      |
+| **Find Usages**          | Locate all references to a type/member                             |
 | **Find Implementations** | Locate all implementations of a interface or abstract class/method |
-| **Get Type Hierarchy**   | Explore type inheritance and derived types                        |
-| **Find Code Smells**     | Detect potential issues in a file                                 |
+| **Get Type Hierarchy**   | Explore type inheritance and derived types                         |
+| **Find Code Smells**     | Detect potential issues in a file                                  |
 
-| Mutation Tool     | Description                                                       |
-|-------------------|-------------------------------------------------------------------|
-| **Rename Symbol** | Rename operation for types, methods, etc.                         |
+| Mutation Tool       | Description                                           |
+| ------------------- | ----------------------------------------------------- |
+| **Rename Symbol**   | Rename operation for types, methods, etc.             |
+| **Format Document** | Format a C# source file using the solution's settings |
 
 
 
@@ -239,20 +240,6 @@ Parameters:
 - `reviewMode` (optional): Review ranking mode. Use 'default' for the existing stream or 'conservative' to suppress lightweight style/trivia noise when stronger issues are present.
 
 
-### `format_document`
-
-Use this tool when you need to format exactly one C# source file in the loaded solution using the solution's current formatting and style settings. Returns whether formatting changes were applied and persisted.
-
-Parameters:
-- `path` (required): The path to the C# source file to format. The file must be part of the currently loaded solution.
-
-## Usage Notes
-
-- For automation, prefer `projectPath` over `projectName` and `projectId`. `projectPath` is the canonical stable project selector.
-- Treat `projectId` as workspace-snapshot-local metadata from the current `load_solution` result. Refresh it after reloads, or avoid it in durable automation.
-- For interactive exploration, `understand_codebase`, `list_types`, and `trace_call_flow` prioritize hand-written source and filter generated/intermediate artifacts such as `obj/`, `bin/`, `.g.cs`, and similar files by default.
-
-
 ### `rename_symbol`
 
 Use this tool when you need to rename a symbol (type, method, property, field, parameter, local variable, etc.) across the entire solution. This performs a safe refactoring that updates all references to the symbol. Returns the list of changed files.
@@ -260,3 +247,11 @@ Use this tool when you need to rename a symbol (type, method, property, field, p
 Parameters:
 - `symbolId` (required): The symbol ID of the symbol to rename. Use 'resolve_symbol' to obtain this if needed.
 - `newName` (required): The new name for the symbol. Must be a valid C# identifier and should not conflict with existing symbols in the same scope.
+
+
+### `format_document`
+
+Use this tool when you need to format exactly one C# source file in the loaded solution using the solution's current formatting and style settings. Returns whether formatting changes were applied and persisted.
+
+Parameters:
+- `path` (required): The path to the C# source file to format. The file must be part of the currently loaded solution.
