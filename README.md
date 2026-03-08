@@ -68,6 +68,7 @@ Traditional AI code assistants often rely on simplistic pattern matching (grep/g
 | **Explain Symbol**       | Understand what a symbol does and where it's used                  |
 | **Trace Call Flow**      | See upstream callers or downstream callees                         |
 | **Find Callers**         | Return only immediate direct upstream callers                      |
+| **Find Callees**         | Return only immediate direct downstream callees                    |
 | **Find Usages**          | Locate all references to a type/member                             |
 | **Find Implementations** | Locate all implementations of a interface or abstract class/method |
 | **Get Type Hierarchy**   | Explore type inheritance and derived types                         |
@@ -198,6 +199,14 @@ Use this tool when you need only the immediate direct upstream callers of a symb
 
 Parameters:
 - `symbolId` (optional): The stable symbol ID, obtained from `resolve_symbol`, `list_types`, or `list_members`, for the symbol whose immediate direct callers you want to inspect.
+
+
+### `find_callees`
+
+Use this tool when you need only the immediate direct downstream callees of a symbol. This is a focused wrapper around call-flow tracing and does not traverse beyond one callee level.
+
+Parameters:
+- `symbolId` (optional): The stable symbol ID, obtained from `resolve_symbol`, `list_types`, or `list_members`, for the symbol whose immediate direct callees you want to inspect.
 
 
 ### `find_usages`
