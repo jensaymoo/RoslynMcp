@@ -22,8 +22,11 @@ public sealed class FindCodeSmellsToolTests(SharedSandboxFixture fixture, ITestO
         result.Error.ShouldBeNone();
         result.Actions.Any(static action => action.RiskLevel == "blocked").IsFalse();
         result.Actions.All(static action => action.RiskLevel is "low" or "review_required" or "high" or "info").IsTrue();
+        result.Actions.All(static action => action.Category is "analyzer" or "correctness" or "design" or "maintainability" or "performance" or "style").IsTrue();
         result.Actions.GroupBy(static action => (action.Location.Line, action.Title, action.Category, action.RiskLevel)).All(static group => group.Count() == 1).IsTrue();
         result.Warnings.Any(static warning => warning.Contains("Deduplicated", StringComparison.Ordinal)).IsTrue();
+        result.Context.SourceBias.Is(SourceBiases.Handwritten);
+        result.Context.ResultCompleteness.Is(ResultCompletenessStates.Complete);
     }
 
     [Fact]
@@ -94,6 +97,14 @@ public sealed class FindCodeSmellsToolTests(SharedSandboxFixture fixture, ITestO
     public async Task FindCodeSmellsAsync_WithInvalidMaxFindings_ReturnsValidationError()
     {
         var result = await Sut.ExecuteAsync(CancellationToken.None, CodeSmellsPath, maxFindings: 0);
+
+        result.Error.ShouldHaveCode(ErrorCodes.InvalidInput);
+    }
+
+    [Fact]
+    public async Task FindCodeSmellsAsync_WithUnsupportedCategory_ReturnsValidationError()
+    {
+        var result = await Sut.ExecuteAsync(CancellationToken.None, CodeSmellsPath, categories: ["security"]);
 
         result.Error.ShouldHaveCode(ErrorCodes.InvalidInput);
     }

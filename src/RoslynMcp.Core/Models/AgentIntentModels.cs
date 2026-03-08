@@ -7,6 +7,40 @@ public enum RiskLevel
     High
 }
 
+public static class SourceBiases
+{
+    public const string Handwritten = "handwritten";
+    public const string Generated = "generated";
+    public const string Mixed = "mixed";
+    public const string Unknown = "unknown";
+}
+
+public static class ResultCompletenessStates
+{
+    public const string Complete = "complete";
+    public const string Partial = "partial";
+    public const string Degraded = "degraded";
+}
+
+public static class WorkspaceReadinessStates
+{
+    public const string Ready = "ready";
+    public const string DegradedMissingArtifacts = "degraded_missing_artifacts";
+    public const string DegradedRestoreRecommended = "degraded_restore_recommended";
+}
+
+public sealed record ResultContextMetadata(
+    string SourceBias,
+    string ResultCompleteness,
+    IReadOnlyList<string> Limitations,
+    IReadOnlyList<string> DegradedReasons,
+    string? RecommendedNextStep = null);
+
+public sealed record WorkspaceReadiness(
+    string State,
+    IReadOnlyList<string> DegradedReasons,
+    string? RecommendedNextStep = null);
+
 public sealed record LoadSolutionRequest(string? SolutionHintPath = null);
 
 public sealed record ProjectSummary(string Name, string? Path);
@@ -19,6 +53,7 @@ public sealed record LoadSolutionResult(
     string WorkspaceSnapshotId,
     IReadOnlyList<ProjectSummary> Projects,
     DiagnosticsSummary BaselineDiagnostics,
+    WorkspaceReadiness Readiness,
     ErrorInfo? Error = null);
 
 public sealed record UnderstandCodebaseRequest(string? Profile = null);
@@ -77,6 +112,7 @@ public sealed record TypeListEntry(
 public sealed record ListTypesResult(
     IReadOnlyList<TypeListEntry> Types,
     int TotalCount,
+    ResultContextMetadata Context,
     ErrorInfo? Error = null);
 
 public sealed record ListMembersRequest(
@@ -193,4 +229,5 @@ public sealed record CodeSmellMatch(
 public sealed record FindCodeSmellsResult(
     IReadOnlyList<CodeSmellMatch> Actions,
     IReadOnlyList<string> Warnings,
+    ResultContextMetadata Context,
     ErrorInfo? Error = null);

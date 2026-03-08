@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using RoslynMcp.Core.Models;
 
 namespace RoslynMcp.Infrastructure.Agent;
 
@@ -8,6 +9,19 @@ internal enum SourceKind
     Generated,
     Intermediate,
     Unknown
+}
+
+internal sealed record SourceVisibilityAssessment(
+    string Visibility,
+    int HandwrittenCount,
+    int GeneratedCount,
+    int UnknownCount)
+{
+    public bool HasHandwritten => HandwrittenCount > 0;
+
+    public bool HasGenerated => GeneratedCount > 0;
+
+    public bool HasUnknown => UnknownCount > 0;
 }
 
 internal static class SourceVisibility
@@ -27,6 +41,46 @@ internal static class SourceVisibility
 
     public static bool ShouldIncludeInInteractiveTrace(string? path)
         => ClassifyPath(path) is SourceKind.HandWritten && !IsLikelyTestPath(path);
+
+    public static bool IsGeneratedLike(string? path)
+        => ToVisibilityBias(ClassifyPath(path)) == SourceBiases.Generated;
+
+    public static SourceVisibilityAssessment AssessPaths(IEnumerable<string?> paths)
+    {
+        ArgumentNullException.ThrowIfNull(paths);
+
+        var handwritten = 0;
+        var generated = 0;
+        var unknown = 0;
+
+        foreach (var path in paths)
+        {
+            switch (ToVisibilityBias(ClassifyPath(path)))
+            {
+                case SourceBiases.Handwritten:
+                    handwritten++;
+                    break;
+                case SourceBiases.Generated:
+                    generated++;
+                    break;
+                default:
+                    unknown++;
+                    break;
+            }
+        }
+
+        return new SourceVisibilityAssessment(
+            DetermineVisibility(handwritten, generated, unknown),
+            handwritten,
+            generated,
+            unknown);
+    }
+
+    public static string DetermineResultSourceBias(IEnumerable<string?> paths)
+    {
+        var assessment = AssessPaths(paths);
+        return assessment.Visibility;
+    }
 
     public static SourceKind ClassifyPath(string? path)
     {
@@ -82,4 +136,32 @@ internal static class SourceVisibility
 
         return project.Name;
     }
+
+    private static string DetermineVisibility(int handwritten, int generated, int unknown)
+    {
+        if (handwritten > 0 && generated > 0)
+        {
+            return SourceBiases.Mixed;
+        }
+
+        if (handwritten > 0)
+        {
+            return SourceBiases.Handwritten;
+        }
+
+        if (generated > 0)
+        {
+            return SourceBiases.Generated;
+        }
+
+        return unknown > 0 ? SourceBiases.Unknown : SourceBiases.Unknown;
+    }
+
+    private static string ToVisibilityBias(SourceKind kind)
+        => kind switch
+        {
+            SourceKind.HandWritten => SourceBiases.Handwritten,
+            SourceKind.Generated or SourceKind.Intermediate => SourceBiases.Generated,
+            _ => SourceBiases.Unknown
+        };
 }

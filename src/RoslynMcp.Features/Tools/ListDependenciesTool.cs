@@ -11,7 +11,7 @@ public sealed class ListDependenciesTool(ICodeUnderstandingService codeUnderstan
     private readonly ICodeUnderstandingService _codeUnderstandingService = codeUnderstandingService ?? throw new ArgumentNullException(nameof(codeUnderstandingService));
 
     [McpServerTool(Name = "list_dependencies", Title = "List Dependencies", ReadOnly = true, Idempotent = true)]
-    [Description("Use this tool when you need to understand how projects relate to each other within a solution. For automation, prefer projectPath as the stable selector; projectId is snapshot-local to the current loaded workspace.")]
+    [Description("Use this tool when you need to understand how projects relate to each other within a solution. For automation, prefer projectPath as the stable selector; projectId is snapshot-local to the active workspace snapshot.")]
     public Task<ListDependenciesResult> ExecuteAsync(CancellationToken cancellationToken,
         [Description("Exact path to a project file (.csproj). Specify only one of projectPath, projectName, or projectId.")]
         string? projectPath = null,

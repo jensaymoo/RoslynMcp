@@ -126,7 +126,7 @@ public static partial class CodeUnderstandingExtensions
 
             var message = normalizedId == null
                 ? "Project selector did not match any loaded project."
-                : "projectId did not match any project in the current loaded snapshot.";
+                : "projectId did not match any project in the active workspace snapshot.";
             var nextAction = normalizedId == null
                 ? "Use load_solution output to provide an exact projectPath, projectName, or projectId."
                 : "projectId values are snapshot-local and can change after reload. Refresh selectors from the current snapshot or prefer projectPath for automation.";

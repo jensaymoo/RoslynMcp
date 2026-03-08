@@ -14,6 +14,14 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
     : ICodeSmellFindingService
 {
     private const int MaximumScannedAnchors = 500;
+    private static readonly string[] SupportedRiskLevels = ["low", "review_required", "high", "info"];
+    private static readonly string[] SupportedCategories = ["analyzer", "correctness", "design", "maintainability", "performance", "style"];
+    private static readonly ResultContextMetadata UnknownContext = new(
+        SourceBiases.Unknown,
+        ResultCompletenessStates.Degraded,
+        Array.Empty<string>(),
+        Array.Empty<string>());
+
     private readonly IRoslynSolutionAccessor _solutionAccessor = solutionAccessor ?? throw new ArgumentNullException(nameof(solutionAccessor));
     private readonly IRefactoringService _refactoringService = refactoringService ?? throw new ArgumentNullException(nameof(refactoringService));
     private readonly RoslynatorAnalyzerCatalog _analyzerCatalog = new();
@@ -37,6 +45,7 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
             return new FindCodeSmellsResult(
                 Array.Empty<CodeSmellMatch>(),
                 Array.Empty<string>(),
+                UnknownContext,
                 AgentErrorInfo.Normalize(solutionError,
                     "Call load_solution first to select a solution before finding code smells."));
         }
@@ -55,7 +64,7 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
                 "Use a source document path that exists in the loaded solution.",
                 ("field", "path"),
                 ("provided", path));
-            return new FindCodeSmellsResult(Array.Empty<CodeSmellMatch>(), Array.Empty<string>(), error);
+            return new FindCodeSmellsResult(Array.Empty<CodeSmellMatch>(), Array.Empty<string>(), UnknownContext, error);
         }
 
         if (matchingDocuments.Length > 1)
@@ -66,7 +75,7 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
                 "Provide a unique source document path from the loaded solution.",
                 ("field", "path"),
                 ("provided", path));
-            return new FindCodeSmellsResult(Array.Empty<CodeSmellMatch>(), Array.Empty<string>(), error);
+            return new FindCodeSmellsResult(Array.Empty<CodeSmellMatch>(), Array.Empty<string>(), UnknownContext, error);
         }
 
         var document = matchingDocuments[0];
@@ -122,7 +131,7 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
             foreach (var action in actionsAtAnchor)
             {
                 var normalizedRiskLevel = NormalizeRiskLevel(action.RiskLevel, action.Origin, action.Category);
-                var normalizedCategory = NormalizeCategory(action.Category, action.Origin);
+                var normalizedCategory = NormalizeCategory(action.Category, action.Origin, action.Title);
                 var match = new CodeSmellMatch(
                     action.Title,
                     normalizedCategory,
@@ -140,7 +149,7 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
                 if (filters.HasReachedLimit(actions.Count))
                 {
                     var limitedMatches = DeduplicateMatches(actions, warnings);
-                    return new FindCodeSmellsResult(limitedMatches, warnings);
+                    return new FindCodeSmellsResult(limitedMatches, warnings, CreateContext(document.FilePath, warnings));
                 }
             }
         }
@@ -151,7 +160,7 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
             warnings.Add("No findings matched the requested riskLevels/categories filters.");
         }
 
-        return new FindCodeSmellsResult(deduped, warnings);
+        return new FindCodeSmellsResult(deduped, warnings, CreateContext(document.FilePath, warnings));
     }
 
     private async Task<IReadOnlyList<AnchorPosition>> CollectAnchorsAsync(Document document, List<string> warnings, CancellationToken ct)
@@ -335,7 +344,7 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
     }
 
     private static FindCodeSmellsResult CreateInvalidInputResult(string message, params (string Key, string? Value)[] details)
-        => new(Array.Empty<CodeSmellMatch>(), Array.Empty<string>(), AgentErrorInfo.Create(ErrorCodes.InvalidInput, message, "Adjust input and retry find_codesmells.", details));
+        => new(Array.Empty<CodeSmellMatch>(), Array.Empty<string>(), UnknownContext, AgentErrorInfo.Create(ErrorCodes.InvalidInput, message, "Adjust input and retry find_codesmells.", details));
 
     private static (FindCodeSmellFilters? Filters, FindCodeSmellsResult? Error) ValidateRequest(FindCodeSmellsRequest request)
     {
@@ -393,7 +402,16 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
                     ("field", "riskLevels")));
             }
 
-            normalized.Add(normalizedRiskLevel);
+            var canonicalRiskLevel = NormalizeRiskLevelFilter(normalizedRiskLevel);
+            if (canonicalRiskLevel is null)
+            {
+                return (null, CreateInvalidInputResult(
+                    $"riskLevels must be drawn from: {string.Join(", ", SupportedRiskLevels)}.",
+                    ("field", "riskLevels"),
+                    ("provided", normalizedRiskLevel)));
+            }
+
+            normalized.Add(canonicalRiskLevel);
         }
 
         return (normalized, null);
@@ -418,7 +436,16 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
                     ("field", "categories")));
             }
 
-            normalized.Add(normalizedCategory);
+            var canonicalCategory = NormalizeCategoryFilter(normalizedCategory);
+            if (canonicalCategory is null)
+            {
+                return (null, CreateInvalidInputResult(
+                    $"categories must be drawn from: {string.Join(", ", SupportedCategories)}.",
+                    ("field", "categories"),
+                    ("provided", normalizedCategory)));
+            }
+
+            normalized.Add(canonicalCategory);
         }
 
         return (normalized, null);
@@ -473,17 +500,100 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
         };
     }
 
-    private static string NormalizeCategory(string? category, string? origin)
+    private static string NormalizeCategory(string? category, string? origin, string? title)
     {
         var normalized = (category ?? string.Empty).Trim().ToLowerInvariant();
-        if (!string.IsNullOrWhiteSpace(normalized))
+        if (string.Equals(origin, "roslynator_diagnostic", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalized, "analyzer", StringComparison.OrdinalIgnoreCase))
         {
-            return normalized;
+            return "analyzer";
         }
 
-        return string.Equals(origin, "roslynator_diagnostic", StringComparison.OrdinalIgnoreCase)
-            ? "analyzer"
-            : "unknown";
+        if (normalized.Contains("performance", StringComparison.Ordinal))
+        {
+            return "performance";
+        }
+
+        if (normalized.Contains("style", StringComparison.Ordinal)
+            || string.Equals(title, "Add braces", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(title, "Remove braces", StringComparison.OrdinalIgnoreCase))
+        {
+            return "style";
+        }
+
+        if (normalized.Contains("design", StringComparison.Ordinal)
+            || normalized.Contains("architecture", StringComparison.Ordinal))
+        {
+            return "design";
+        }
+
+        if (normalized.Contains("correct", StringComparison.Ordinal)
+            || normalized.Contains("bug", StringComparison.Ordinal))
+        {
+            return "correctness";
+        }
+
+        if (!string.IsNullOrWhiteSpace(normalized))
+        {
+            return normalized switch
+            {
+                "refactoring" or "readability" or "maintainability" => "maintainability",
+                _ => "maintainability"
+            };
+        }
+
+        return "maintainability";
+    }
+
+    private static string? NormalizeRiskLevelFilter(string riskLevel)
+        => riskLevel.Trim().ToLowerInvariant() switch
+        {
+            "safe" or "low" => "low",
+            "medium" or "review_required" => "review_required",
+            "blocked" or "high" => "high",
+            "info" => "info",
+            _ => null
+        };
+
+    private static string? NormalizeCategoryFilter(string category)
+        => category.Trim().ToLowerInvariant() switch
+        {
+            "analyzer" => "analyzer",
+            "bug" or "correctness" => "correctness",
+            "design" or "architecture" => "design",
+            "maintainability" or "readability" or "refactoring" => "maintainability",
+            "performance" => "performance",
+            "style" => "style",
+            _ => null
+        };
+
+    private static ResultContextMetadata CreateContext(string? documentPath, IReadOnlyList<string> warnings)
+    {
+        var degradedReasons = new List<string>();
+        if (warnings.Any(static warning => warning.Contains("Skipped", StringComparison.Ordinal)))
+        {
+            degradedReasons.Add("analysis_positions_skipped");
+        }
+
+        if (warnings.Any(static warning => warning.Contains("truncated", StringComparison.OrdinalIgnoreCase)))
+        {
+            degradedReasons.Add("anchor_scan_truncated");
+        }
+
+        var limitations = new List<string>();
+        if (SourceVisibility.IsGeneratedLike(documentPath))
+        {
+            limitations.Add("Generated or intermediate source can skew results toward analyzer-driven findings.");
+        }
+
+        return new ResultContextMetadata(
+            SourceVisibility.DetermineResultSourceBias([documentPath]),
+            degradedReasons.Count > 0 ? ResultCompletenessStates.Partial : ResultCompletenessStates.Complete,
+            limitations,
+            degradedReasons,
+            degradedReasons.Count > 0
+                ? "If findings look incomplete, restore/build the workspace and retry find_codesmells."
+                : null);
     }
 
     private static IReadOnlyList<CodeSmellMatch> DeduplicateMatches(IReadOnlyList<CodeSmellMatch> matches, List<string> warnings)

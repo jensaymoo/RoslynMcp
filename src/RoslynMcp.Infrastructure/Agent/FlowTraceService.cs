@@ -9,6 +9,9 @@ namespace RoslynMcp.Infrastructure.Agent;
 
 public sealed class FlowTraceService(INavigationService navigationService, IRoslynSolutionAccessor solutionAccessor) : IFlowTraceService
 {
+    private const string UnresolvedProjectLabel = "unresolved_project";
+    private const string ProjectInferenceDegradedLabel = "project_inference_degraded";
+
     private readonly INavigationService _navigationService = navigationService ?? throw new ArgumentNullException(nameof(navigationService));
     private readonly IRoslynSolutionAccessor _solutionAccessor = solutionAccessor ?? throw new ArgumentNullException(nameof(solutionAccessor));
 
@@ -105,8 +108,8 @@ public sealed class FlowTraceService(INavigationService navigationService, IRosl
 
         var transitions = filteredEdges
             .GroupBy(edge => (
-                From: symbolProjects?.GetValueOrDefault(edge.FromSymbolId, "unknown") ?? "unknown",
-                To: symbolProjects?.GetValueOrDefault(edge.ToSymbolId, "unknown") ?? "unknown"))
+                From: symbolProjects?.GetValueOrDefault(edge.FromSymbolId, UnresolvedProjectLabel) ?? UnresolvedProjectLabel,
+                To: symbolProjects?.GetValueOrDefault(edge.ToSymbolId, UnresolvedProjectLabel) ?? UnresolvedProjectLabel))
             .OrderByDescending(static group => group.Count())
             .ThenBy(static group => group.Key.From, StringComparer.Ordinal)
             .ThenBy(static group => group.Key.To, StringComparer.Ordinal)
@@ -161,6 +164,10 @@ public sealed class FlowTraceService(INavigationService navigationService, IRosl
 
     private async Task<SymbolFlowFacts?> ResolveSymbolFactsAsync(Solution solution, string symbolId, CancellationToken ct)
     {
+        var sourceProjectNames = new HashSet<string>(StringComparer.Ordinal);
+        string? declarationPath = null;
+        var resolvedWithoutSource = false;
+
         foreach (var project in solution.Projects)
         {
             ct.ThrowIfCancellationRequested();
@@ -178,21 +185,52 @@ public sealed class FlowTraceService(INavigationService navigationService, IRosl
             }
 
             var normalized = symbol.OriginalDefinition ?? symbol;
-            var sourcePath = normalized.Locations.FirstOrDefault(static location => location.IsInSource)?.GetLineSpan().Path;
-            if (string.IsNullOrWhiteSpace(sourcePath))
+
+            var sourceLocations = normalized.Locations
+                .Where(static location => location.IsInSource && location.SourceTree is not null)
+                .ToArray();
+
+            if (sourceLocations.Length == 0)
             {
-                return null;
+                resolvedWithoutSource = true;
+                continue;
             }
 
-            if (!SourceVisibility.ShouldIncludeInInteractiveTrace(sourcePath))
-            {
-                return null;
-            }
+            declarationPath ??= SelectDeclarationPath(sourceLocations);
 
-            return new SymbolFlowFacts(normalized.ResolveProjectName(project), sourcePath);
+            foreach (var location in sourceLocations)
+            {
+                var document = solution.GetDocument(location.SourceTree!);
+                if (document != null)
+                {
+                    sourceProjectNames.Add(document.Project.Name);
+                }
+            }
         }
 
-        return null;
+        if (string.IsNullOrWhiteSpace(declarationPath))
+        {
+            return resolvedWithoutSource
+                ? new SymbolFlowFacts(UnresolvedProjectLabel, null)
+                : null;
+        }
+
+        if (!SourceVisibility.ShouldIncludeInInteractiveTrace(declarationPath))
+        {
+            return null;
+        }
+
+        if (sourceProjectNames.Count == 1)
+        {
+            return new SymbolFlowFacts(sourceProjectNames.Single(), declarationPath);
+        }
+
+        if (sourceProjectNames.Count > 1)
+        {
+            return new SymbolFlowFacts(ProjectInferenceDegradedLabel, declarationPath);
+        }
+
+        return new SymbolFlowFacts(UnresolvedProjectLabel, declarationPath);
     }
 
     private static bool ShouldIncludeEdge(CallEdge edge, IReadOnlyDictionary<string, SymbolFlowFacts> symbolFacts)
@@ -200,6 +238,17 @@ public sealed class FlowTraceService(INavigationService navigationService, IRosl
            && symbolFacts.ContainsKey(edge.ToSymbolId)
            && SourceVisibility.ShouldIncludeInInteractiveTrace(symbolFacts[edge.FromSymbolId].DeclarationPath)
            && SourceVisibility.ShouldIncludeInInteractiveTrace(symbolFacts[edge.ToSymbolId].DeclarationPath);
+
+    private static string? SelectDeclarationPath(IReadOnlyList<Location> locations)
+    {
+        return locations
+            .Select(static location => location.GetLineSpan().Path)
+            .Where(static path => !string.IsNullOrWhiteSpace(path))
+            .OrderBy(static path => SourceVisibility.ShouldIncludeInInteractiveTrace(path) ? 0 : 1)
+            .ThenBy(static path => SourceVisibility.ShouldIncludeInHumanResults(path) ? 0 : 1)
+            .ThenBy(static path => path, StringComparer.Ordinal)
+            .FirstOrDefault();
+    }
 
     private sealed record SymbolFlowFacts(string ProjectName, string? DeclarationPath);
 }

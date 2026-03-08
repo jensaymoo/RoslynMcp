@@ -7,6 +7,12 @@ namespace RoslynMcp.Infrastructure.Agent.Handlers;
 
 internal sealed class ListTypesHandler
 {
+    private static readonly ResultContextMetadata EmptyContext = new(
+        SourceBiases.Unknown,
+        ResultCompletenessStates.Degraded,
+        Array.Empty<string>(),
+        Array.Empty<string>());
+
     private readonly CodeUnderstandingQueryService _queries;
 
     public ListTypesHandler(CodeUnderstandingQueryService queries)
@@ -27,6 +33,7 @@ internal sealed class ListTypesHandler
             return new ListTypesResult(
                 Array.Empty<TypeListEntry>(),
                 0,
+                EmptyContext,
                 AgentErrorInfo.Normalize(solutionError, "Call load_solution first to select a solution before listing types."));
         }
 
@@ -35,6 +42,7 @@ internal sealed class ListTypesHandler
             return new ListTypesResult(
                 Array.Empty<TypeListEntry>(),
                 0,
+                EmptyContext,
                 AgentErrorInfo.Create(
                     ErrorCodes.InvalidInput,
                     "kind must be one of: class, record, interface, enum, struct.",
@@ -49,6 +57,7 @@ internal sealed class ListTypesHandler
             return new ListTypesResult(
                 Array.Empty<TypeListEntry>(),
                 0,
+                EmptyContext,
                 AgentErrorInfo.Create(
                     ErrorCodes.InvalidInput,
                     "accessibility must be one of: public, internal, protected, private, protected_internal, private_protected.",
@@ -67,18 +76,34 @@ internal sealed class ListTypesHandler
 
         if (selectorError != null)
         {
-            return new ListTypesResult(Array.Empty<TypeListEntry>(), 0, selectorError);
+            return new ListTypesResult(Array.Empty<TypeListEntry>(), 0, EmptyContext, selectorError);
         }
 
         var namespacePrefix = request.NamespacePrefix.NormalizeOptional();
         var entries = new List<TypeListEntry>();
         var generatedFallbackEntries = new List<TypeListEntry>();
+        var selectedProjectDocumentPaths = new List<string?>();
+        var degradedReasons = new HashSet<string>(StringComparer.Ordinal);
+        var limitations = new List<string>();
 
         foreach (var project in selectedProjects)
         {
+            selectedProjectDocumentPaths.AddRange(project.Documents.Select(static document => document.FilePath));
+
+            var missingDocuments = project.Documents
+                .Where(static document => !string.IsNullOrWhiteSpace(document.FilePath))
+                .Where(static document => !File.Exists(document.FilePath!))
+                .ToArray();
+
+            if (missingDocuments.Length > 0)
+            {
+                degradedReasons.Add("missing_artifacts");
+            }
+
             var compilation = await project.GetCompilationAsync(ct).ConfigureAwait(false);
             if (compilation == null)
             {
+                degradedReasons.Add("compilation_unavailable");
                 continue;
             }
 
@@ -136,6 +161,11 @@ internal sealed class ListTypesHandler
         if (entries.Count == 0 && generatedFallbackEntries.Count > 0)
         {
             entries.AddRange(generatedFallbackEntries);
+            limitations.Add("Only generated declarations are currently visible for the selected project selector.");
+        }
+        else if (generatedFallbackEntries.Count > 0)
+        {
+            limitations.Add("Default results prefer handwritten declarations; generated declarations were omitted from the visible list.");
         }
 
         var ordered = entries
@@ -147,6 +177,57 @@ internal sealed class ListTypesHandler
 
         var (offset, limit) = request.Offset.NormalizePaging(request.Limit);
         var paged = ordered.Skip(offset).Take(limit).ToArray();
-        return new ListTypesResult(paged, ordered.Length);
+
+        var selectedVisibility = SourceVisibility.AssessPaths(selectedProjectDocumentPaths);
+        var returnedSourceBias = ordered.Length > 0
+            ? SourceVisibility.DetermineResultSourceBias(ordered.Select(static entry => entry.FilePath))
+            : selectedVisibility.Visibility;
+
+        if (ordered.Length == 0 && degradedReasons.Contains("missing_artifacts"))
+        {
+            limitations.Add("Type discovery is degraded because referenced source or generated artifacts are missing from the current workspace.");
+        }
+
+        if (ordered.Length == 0 && degradedReasons.Contains("compilation_unavailable"))
+        {
+            limitations.Add("Type discovery is degraded because the selected project compilation is not available yet.");
+        }
+
+        var recommendedNextStep = degradedReasons.Count > 0
+            ? "Run dotnet restore/build and retry list_types if the current project should expose additional declarations."
+            : null;
+
+        var context = new ResultContextMetadata(
+            returnedSourceBias,
+            DetermineCompleteness(ordered.Length, degradedReasons.Count > 0, selectedVisibility, generatedFallbackEntries.Count > 0),
+            limitations.Distinct(StringComparer.Ordinal).ToArray(),
+            degradedReasons.OrderBy(static value => value, StringComparer.Ordinal).ToArray(),
+            recommendedNextStep);
+
+        return new ListTypesResult(paged, ordered.Length, context);
+    }
+
+    private static string DetermineCompleteness(
+        int totalCount,
+        bool isDegraded,
+        SourceVisibilityAssessment selectedVisibility,
+        bool hadGeneratedFallback)
+    {
+        if (isDegraded)
+        {
+            return ResultCompletenessStates.Degraded;
+        }
+
+        if (totalCount > 0 && hadGeneratedFallback && !selectedVisibility.HasHandwritten)
+        {
+            return ResultCompletenessStates.Partial;
+        }
+
+        if (totalCount == 0 && hadGeneratedFallback && selectedVisibility.HasGenerated && !selectedVisibility.HasHandwritten)
+        {
+            return ResultCompletenessStates.Partial;
+        }
+
+        return ResultCompletenessStates.Complete;
     }
 }

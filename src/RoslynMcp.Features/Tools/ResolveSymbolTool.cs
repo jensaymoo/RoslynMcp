@@ -27,7 +27,7 @@ public sealed class ResolveSymbolTool(ICodeUnderstandingService codeUnderstandin
         string? projectPath = null,
         [Description("Optional project scope for qualifiedName lookup — name of a project that contains the symbol. Use to narrow ambiguous matches.")]
         string? projectName = null,
-        [Description("Optional project scope for qualifiedName lookup — project ID from the current loaded workspace snapshot. projectId values are snapshot-local and can change after reload, so prefer projectPath when you need a durable selector.")]
+        [Description("Optional project scope for qualifiedName lookup — project ID from the active workspace snapshot. projectId values are snapshot-local and can change after reload, so prefer projectPath when you need a durable selector.")]
         string? projectId = null
         )
         => _codeUnderstandingService.ResolveSymbolAsync(symbolId.ToResolveSymbolRequest(path, line, column, qualifiedName, projectPath, projectName, projectId), cancellationToken);

@@ -28,6 +28,8 @@ public sealed class ListTypesToolTests(SharedSandboxFixture fixture, ITestOutput
         var result = await Sut.ExecuteAsync(CancellationToken.None, projectPath: project.Path);
 
         result.ShouldMatchTypes(2, "AppEntryPoints", "AppOrchestrator");
+        result.Context.SourceBias.Is(SourceBiases.Handwritten);
+        result.Context.Limitations.Any(static limitation => limitation.Contains("generated declarations were omitted", StringComparison.OrdinalIgnoreCase)).IsTrue();
     }
 
     [Fact]
@@ -113,7 +115,7 @@ public sealed class ListTypesToolTests(SharedSandboxFixture fixture, ITestOutput
     {
         var result = await Sut.ExecuteAsync(CancellationToken.None, projectId: "00000000-0000-0000-0000-000000000000");
 
-        result.ShouldHaveError(ErrorCodes.InvalidInput, "projectId did not match any project in the current loaded snapshot.");
+        result.ShouldHaveError(ErrorCodes.InvalidInput, "projectId did not match any project in the active workspace snapshot.");
         result.TotalCount.Is(0);
         result.Types.Count.Is(0);
         result.Error!.Details!["projectIdScope"].Is("snapshot-local");
@@ -184,5 +186,51 @@ public sealed class ListTypesToolIsolatedTests(ITestOutputHelper output)
         result.Error.ShouldBeNone();
         result.TotalCount.Is(1);
         result.Types.Select(static type => type.DisplayName).Is("GeneratedExecutionHooks");
+        result.Context.SourceBias.Is(SourceBiases.Generated);
+        result.Context.ResultCompleteness.Is(ResultCompletenessStates.Partial);
+        result.Context.Limitations.Any(static limitation => limitation.Contains("Only generated declarations", StringComparison.Ordinal)).IsTrue();
+    }
+
+    [Fact]
+    public async Task ListTypesAsync_WithMissingGeneratedArtifacts_ReportsDegradedDiscovery()
+    {
+        await using var context = await CreateContextAsync();
+        var sut = GetSut(context);
+        var loadSolution = context.GetRequiredService<LoadSolutionTool>();
+        var projectFilePath = Path.Combine(context.TestSolutionDirectory, "ProjectApp", "ProjectApp.csproj");
+        var generatedPath = Path.Combine(context.TestSolutionDirectory, "ProjectApp", "obj", "Debug", "net10.0", "GeneratedExecutionHooks.g.cs");
+
+        await File.WriteAllTextAsync(projectFilePath, """
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="obj\Debug\net10.0\GeneratedExecutionHooks.g.cs" />
+    <ProjectReference Include="..\ProjectCore\ProjectCore.csproj" />
+  </ItemGroup>
+
+</Project>
+""", CancellationToken.None);
+        File.Delete(generatedPath);
+
+        var load = await loadSolution.ExecuteAsync(CancellationToken.None, context.SolutionPath);
+
+        load.Error.ShouldBeNone();
+        load.Readiness.State.Is(WorkspaceReadinessStates.DegradedMissingArtifacts);
+
+        var result = await sut.ExecuteAsync(CancellationToken.None, projectName: "ProjectApp");
+
+        result.Error.ShouldBeNone();
+        result.TotalCount.Is(0);
+        result.Context.SourceBias.Is(SourceBiases.Generated);
+        result.Context.ResultCompleteness.Is(ResultCompletenessStates.Degraded);
+        result.Context.DegradedReasons.IsContaining("missing_artifacts");
+        result.Context.RecommendedNextStep.IsNotNull();
     }
 }

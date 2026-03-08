@@ -11,7 +11,7 @@ public sealed class ListTypesTool(ICodeUnderstandingService codeUnderstandingSer
     private readonly ICodeUnderstandingService _codeUnderstandingService = codeUnderstandingService ?? throw new ArgumentNullException(nameof(codeUnderstandingService));
 
     [McpServerTool(Name = "list_types", Title = "List Types", ReadOnly = true, Idempotent = true)]
-    [Description("Use this tool when you need to list types declared in a specific loaded project. For automation, prefer projectPath as the stable selector; projectId is snapshot-local. Results favor hand-written source by default for interactive discovery.")]
+    [Description("Use this tool when you need to list types declared in a specific loaded project. For automation, prefer projectPath as the stable selector; projectId is snapshot-local to the active workspace snapshot. Results prefer handwritten declarations by default and now report source bias, completeness, and degraded discovery hints.")]
     public Task<ListTypesResult> ExecuteAsync(CancellationToken cancellationToken,
         [Description("Exact path to a project file (.csproj). Specify only one of projectPath, projectName, or projectId.")]
         string? projectPath = null,

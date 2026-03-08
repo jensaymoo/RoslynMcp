@@ -1,4 +1,5 @@
 using Is.Assertions;
+using RoslynMcp.Core.Models;
 using RoslynMcp.Features.Tests.Mutations;
 using RoslynMcp.Features.Tools;
 using Xunit;
@@ -17,6 +18,7 @@ public sealed class LoadSolutionToolTests(SharedSandboxFixture fixture, ITestOut
         result.SelectedSolutionPath.Is(Context.SolutionPath);
         string.Equals(Context.SolutionPath, Context.CanonicalSolutionPath, StringComparison.OrdinalIgnoreCase).IsFalse();
         result.Error.ShouldBeNone();
+        result.Readiness.State.Is(WorkspaceReadinessStates.Ready);
 
         var projectNames = result.Projects.Select(static project => project.Name).ToArray();
 
@@ -67,5 +69,24 @@ public sealed class LoadSolutionToolIsolatedTests(ITestOutputHelper output)
 
         result.Error.ShouldBeNone();
         result.BaselineDiagnostics.ErrorCount.Is(0);
+        result.Readiness.State.Is(WorkspaceReadinessStates.DegradedRestoreRecommended);
+        result.Readiness.DegradedReasons.IsContaining("generated_or_intermediate_diagnostics");
+    }
+
+    [Fact]
+    public async Task LoadSolutionAsync_WithMissingGeneratedDocument_ReportsMissingArtifactsReadiness()
+    {
+        await using var context = await CreateContextAsync();
+        var sut = GetSut(context);
+        var generatedPath = Path.Combine(context.TestSolutionDirectory, "ProjectApp", "obj", "Debug", "net10.0", "GeneratedExecutionHooks.g.cs");
+
+        File.Delete(generatedPath);
+
+        var result = await sut.ExecuteAsync(CancellationToken.None, context.SolutionPath);
+
+        result.Error.ShouldBeNone();
+        result.Readiness.State.Is(WorkspaceReadinessStates.DegradedMissingArtifacts);
+        result.Readiness.DegradedReasons.IsContaining("missing_artifacts");
+        result.Readiness.RecommendedNextStep.IsNotNull();
     }
 }
