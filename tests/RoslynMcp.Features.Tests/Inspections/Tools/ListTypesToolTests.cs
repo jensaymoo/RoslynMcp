@@ -3,6 +3,7 @@ using RoslynMcp.Core;
 using RoslynMcp.Core.Models;
 using RoslynMcp.Features.Tests.Mutations;
 using RoslynMcp.Features.Tools;
+using RoslynMcp.Features.Tools.Inspections;
 using RoslynMcp.Infrastructure.Workspace;
 using Xunit;
 using Xunit.Abstractions;

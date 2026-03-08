@@ -1,10 +1,10 @@
+using System.ComponentModel;
 using ModelContextProtocol.Server;
+using RoslynMcp.Core;
 using RoslynMcp.Core.Contracts;
 using RoslynMcp.Core.Models;
-using RoslynMcp.Core;
-using System.ComponentModel;
 
-namespace RoslynMcp.Features.Tools;
+namespace RoslynMcp.Features.Tools.Inspections;
 
 public sealed class FindImplementationsTool(INavigationService navigationService) : Tool
 {

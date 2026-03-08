@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using RoslynMcp.Core.Models;
 using RoslynMcp.Features.Tools;
+using RoslynMcp.Features.Tools.Inspections;
 using RoslynMcp.Infrastructure;
 
 namespace RoslynMcp.Features.Tests;

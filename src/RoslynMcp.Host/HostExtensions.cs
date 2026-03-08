@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using RoslynMcp.Features.Tools;
+using Tool = RoslynMcp.Features.Tools.Tool;
 
 namespace RoslynMcp.Host;
 
@@ -15,7 +16,7 @@ public static class HostExtensions
     {
         public void Compose() => services
             .AddInfrastructure()
-            .AddImplementations<Features.Tool>()
+            .AddImplementations<Tool>()
             .AddMcpRuntime();
 
         private void AddMcpRuntime()
@@ -38,7 +39,7 @@ public static class HostExtensions
             });
 
             builder.WithStdioServerTransport();
-            builder.WithTools(FeatureExtensions.GetImplementations<Features.Tool>(), serializerOptions);
+            builder.WithTools(FeatureExtensions.GetImplementations<Tool>(), serializerOptions);
 
             services.AddSingleton<HostRuntime>();
             services.AddHostedService(provider => provider.GetRequiredService<HostRuntime>());

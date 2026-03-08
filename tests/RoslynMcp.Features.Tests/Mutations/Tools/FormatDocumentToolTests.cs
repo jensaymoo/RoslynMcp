@@ -1,6 +1,7 @@
 using Is.Assertions;
 using RoslynMcp.Core;
 using RoslynMcp.Features.Tools;
+using RoslynMcp.Features.Tools.Mutations;
 using Xunit;
 using Xunit.Abstractions;
 

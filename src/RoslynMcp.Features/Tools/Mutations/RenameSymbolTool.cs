@@ -1,10 +1,10 @@
+using System.ComponentModel;
 using ModelContextProtocol.Server;
 using RoslynMcp.Core;
 using RoslynMcp.Core.Contracts;
 using RoslynMcp.Core.Models;
-using System.ComponentModel;
 
-namespace RoslynMcp.Features.Tools;
+namespace RoslynMcp.Features.Tools.Mutations;
 
 public sealed class RenameSymbolTool(IRefactoringService refactoringService) : Tool
 {
