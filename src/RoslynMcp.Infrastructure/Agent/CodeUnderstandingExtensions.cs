@@ -238,13 +238,13 @@ public static partial class CodeUnderstandingExtensions
 
     public static bool MatchesQualifiedName(this ISymbol symbol, string normalizedQualifiedName)
     {
-        var full = symbol.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.FullyQualifiedFormat).NormalizeQualifiedName();
+        var full = symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).NormalizeQualifiedName();
         if (string.Equals(full, normalizedQualifiedName, StringComparison.Ordinal))
         {
             return true;
         }
 
-        var csharpError = symbol.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.CSharpErrorMessageFormat).NormalizeQualifiedName();
+        var csharpError = symbol.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat).NormalizeQualifiedName();
         return string.Equals(csharpError, normalizedQualifiedName, StringComparison.Ordinal);
     }
 
@@ -263,7 +263,7 @@ public static partial class CodeUnderstandingExtensions
         }
 
         var namespaceSymbol = symbol.ContainingNamespace;
-        while (namespaceSymbol != null && !namespaceSymbol.IsGlobalNamespace)
+        while (namespaceSymbol is { IsGlobalNamespace: false })
         {
             segments.Push(new QualifiedNameSegment(namespaceSymbol.Name, null));
             namespaceSymbol = namespaceSymbol.ContainingNamespace;
@@ -281,7 +281,7 @@ public static partial class CodeUnderstandingExtensions
 
         var segments = new Stack<QualifiedNameSegment>();
         var namespaceSymbol = symbol.ContainingNamespace;
-        while (namespaceSymbol != null && !namespaceSymbol.IsGlobalNamespace)
+        while (namespaceSymbol is { IsGlobalNamespace: false })
         {
             segments.Push(new QualifiedNameSegment(namespaceSymbol.Name, null));
             namespaceSymbol = namespaceSymbol.ContainingNamespace;
@@ -301,33 +301,44 @@ public static partial class CodeUnderstandingExtensions
         return names;
     }
 
-    public static string ToReadableHandle(this ISymbol symbol)
-        => $"{symbol.GetReadableHandlePrefix()}:{symbol.ToQualifiedDisplayName()}";
-
-    public static string ToQualifiedDisplayName(this ISymbol symbol)
+    extension(ISymbol symbol)
     {
-        if (symbol is INamedTypeSymbol namedType)
+        public string ToReadableHandle() => $"{symbol.GetReadableHandlePrefix()}:{symbol.ToQualifiedDisplayName()}";
+
+        public string ToQualifiedDisplayName()
         {
-            return namedType.ToReadableQualifiedTypeName();
+            switch (symbol)
+            {
+                case INamedTypeSymbol namedType:
+                    return namedType.ToReadableQualifiedTypeName();
+                case IMethodSymbol method:
+                {
+                    var container = method.ContainingType?.ToReadableQualifiedTypeName() ?? method.ContainingNamespace.NormalizeNamespace();
+                    var methodName = method.MethodKind == MethodKind.Constructor
+                        ? method.ContainingType?.Name ?? method.Name
+                        : method.Name;
+                    var parameters = string.Join(", ", method.Parameters.Select(static parameter => parameter.Type.ToReadableTypeReference(includeNamespaces: false)));
+                    return $"{container}.{methodName}({parameters})";
+                }
+            }
+
+            if (symbol.ContainingType != null)
+                return $"{symbol.ContainingType.ToReadableQualifiedTypeName()}.{symbol.Name}";
+
+            var ns = symbol.ContainingNamespace.NormalizeNamespace();
+
+            return string.IsNullOrEmpty(ns) ? symbol.Name : $"{ns}.{symbol.Name}";
         }
 
-        if (symbol is IMethodSymbol method)
+        public SymbolReference ToSymbolReference()
         {
-            var container = method.ContainingType?.ToReadableQualifiedTypeName() ?? method.ContainingNamespace.NormalizeNamespace();
-            var methodName = method.MethodKind == MethodKind.Constructor
-                ? method.ContainingType?.Name ?? method.Name
-                : method.Name;
-            var parameters = string.Join(", ", method.Parameters.Select(static parameter => parameter.Type.ToReadableTypeReference(includeNamespaces: false)));
-            return $"{container}.{methodName}({parameters})";
+            var (filePath, line, column) = symbol.GetDeclarationPosition();
+            return new SymbolReference(
+                SymbolIdentity.CreateId(symbol),
+                symbol.ToReadableHandle(),
+                symbol.ToQualifiedDisplayName(),
+                CreateOptionalSourceLocation(filePath, line, column));
         }
-
-        if (symbol.ContainingType != null)
-        {
-            return $"{symbol.ContainingType.ToReadableQualifiedTypeName()}.{symbol.Name}";
-        }
-
-        var ns = symbol.ContainingNamespace.NormalizeNamespace();
-        return string.IsNullOrEmpty(ns) ? symbol.Name : $"{ns}.{symbol.Name}";
     }
 
     public static string ToReadableQualifiedTypeName(this INamedTypeSymbol type)
@@ -341,14 +352,10 @@ public static partial class CodeUnderstandingExtensions
 
         var typeStack = new Stack<INamedTypeSymbol>();
         for (var current = type; current != null; current = current.ContainingType)
-        {
             typeStack.Push(current);
-        }
 
         while (typeStack.Count > 0)
-        {
             segments.Add(typeStack.Pop().ToReadableTypeName());
-        }
 
         return string.Join(".", segments);
     }
@@ -367,16 +374,6 @@ public static partial class CodeUnderstandingExtensions
             ? type.TypeParameters.Select(static parameter => parameter.Name)
             : type.TypeArguments.Select(static argument => argument.ToReadableTypeReference(includeNamespaces: false));
         return $"{type.Name}<{string.Join(", ", typeParameters)}>";
-    }
-
-    public static SymbolReference ToSymbolReference(this ISymbol symbol)
-    {
-        var (filePath, line, column) = symbol.GetDeclarationPosition();
-        return new SymbolReference(
-            SymbolIdentity.CreateId(symbol),
-            symbol.ToReadableHandle(),
-            symbol.ToQualifiedDisplayName(),
-            CreateOptionalSourceLocation(filePath, line, column));
     }
 
     public static SymbolReference CreateSymbolReference(
@@ -429,20 +426,23 @@ public static partial class CodeUnderstandingExtensions
             reference);
     }
 
-    public static DiagnosticsSummary ToDiagnosticsSummary(this IReadOnlyList<DiagnosticItem> diagnostics)
+    extension(IReadOnlyList<DiagnosticItem> diagnostics)
     {
-        var error = diagnostics.Count(static d => string.Equals(d.Severity, "error", StringComparison.OrdinalIgnoreCase));
-        var warning = diagnostics.Count(static d => string.Equals(d.Severity, "warning", StringComparison.OrdinalIgnoreCase));
-        var info = diagnostics.Count - error - warning;
-        return new DiagnosticsSummary(error, warning, info, diagnostics.Count);
-    }
+        public DiagnosticsSummary ToDiagnosticsSummary()
+        {
+            var error = diagnostics.Count(static d => string.Equals(d.Severity, "error", StringComparison.OrdinalIgnoreCase));
+            var warning = diagnostics.Count(static d => string.Equals(d.Severity, "warning", StringComparison.OrdinalIgnoreCase));
+            var info = diagnostics.Count - error - warning;
+            return new DiagnosticsSummary(error, warning, info, diagnostics.Count);
+        }
 
-    public static DiagnosticsSummary ToLoadBaselineDiagnosticsSummary(this IReadOnlyList<DiagnosticItem> diagnostics)
-    {
-        var filtered = diagnostics
-            .Where(static diagnostic => SourceVisibility.ClassifyPath(diagnostic.Location.FilePath) is SourceKind.HandWritten or SourceKind.Unknown)
-            .ToArray();
+        public DiagnosticsSummary ToLoadBaselineDiagnosticsSummary()
+        {
+            var filtered = diagnostics
+                .Where(static diagnostic => SourceVisibility.ClassifyPath(diagnostic.Location.FilePath) is SourceKind.HandWritten or SourceKind.Unknown)
+                .ToArray();
 
-        return filtered.ToDiagnosticsSummary();
+            return filtered.ToDiagnosticsSummary();
+        }
     }
 }

@@ -20,7 +20,7 @@ internal sealed class ExplainSymbolHandler(
             "Call load_solution first to select a solution before explaining symbols.",
             request.Path,
             ct).ConfigureAwait(false);
-        
+
         if (bootstrapError != null)
             return new ExplainSymbolResult(null, string.Empty, string.Empty, [], [], bootstrapError);
 
@@ -45,7 +45,7 @@ internal sealed class ExplainSymbolHandler(
             .OrderByDescending(static group => group.Count())
             .ThenBy(static group => group.Key, StringComparer.OrdinalIgnoreCase)
             .Take(3)
-            .Select(group => new ImpactHint(group.Key ?? string.Empty, "high reference density", group.Count()))
+            .Select(group => new ImpactHint(group.Key, "high reference density", group.Count()))
             .ToArray();
 
         var roleSummary = await BuildRoleSummaryAsync(symbolResult.Symbol, outline, references, ct).ConfigureAwait(false);
