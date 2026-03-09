@@ -115,7 +115,7 @@ Parameters:
 
 ### `list_types`
 
-Use this tool when you need to list types declared in a specific loaded project. It is useful for project-scoped discovery and for finding type symbols by name before calling tools like `list_members`, `resolve_symbol`, or `get_type_hierarchy`. For automation, prefer projectPath as the stable selector; projectId is snapshot-local to the active workspace snapshot. Results prefer handwritten declarations by default and now report source bias, completeness, and degraded discovery hints.
+Use this tool when you need to list types declared in a specific loaded project. It is useful for project-scoped discovery and for finding type symbols by name before calling tools like `list_members`, `resolve_symbol`, or `get_type_hierarchy`. For automation, prefer projectPath as the stable selector; projectId is snapshot-local to the active workspace snapshot. Results prefer handwritten declarations by default, can optionally include XML documentation summaries for returned entries, and report source bias, completeness, and degraded discovery hints.
 
 Parameters:
 - `projectPath` (optional): Exact path to a project file (`.csproj`). This is the recommended stable selector for automation. Specify only one of `projectPath`, `projectName`, or `projectId`.
@@ -124,6 +124,7 @@ Parameters:
 - `namespacePrefix` (optional): Filter to only types in namespaces starting with this prefix.
 - `kind` (optional): Filter by type kind: `class`, `record`, `interface`, `enum`, or `struct`.
 - `accessibility` (optional): Filter by accessibility: `public`, `internal`, `protected`, `private`, `protected_internal`, or `private_protected`.
+- `includeSummary` (optional): When `true`, includes XML documentation summaries for returned type entries when available. Defaults to `false`.
 - `limit` (optional): Maximum number of results to return. Defaults to `100`, maximum `500`.
 - `offset` (optional): Number of results to skip for pagination. Defaults to `0`.
 
@@ -170,13 +171,18 @@ Parameters:
 
 ### `explain_symbol`
 
-Use this tool when you need to understand what a specific symbol (type, method, property, field, etc.) does, what its signature looks like, and where it is used in the codebase. It provides a human-readable explanation along with impact hints showing areas with high reference density.
+Use this tool when you need to understand what a specific symbol (type, method, property, field, etc.) does, what its signature looks like, where it is used in the codebase, and what XML documentation it already exposes. It provides a human-readable explanation along with impact hints showing areas with high reference density.
 
 Parameters:
 - `symbolId` (optional): The stable symbol ID, obtained from `resolve_symbol`, `list_types`, or `list_members`. Provide this OR `path`+`line`+`column`.
 - `path` (optional): Path to a source file. Provide this together with `line` and `column` instead of `symbolId`.
 - `line` (optional): Line number (1-based) pointing to the symbol in the source file.
 - `column` (optional): Column number (1-based) pointing to the symbol in the source file.
+
+The result includes a `documentation` field with:
+- `summary`: The XML summary comment
+- `returns`: The return value description (for methods)
+- `parameters`: List of parameter names and descriptions (for methods)
 
 
 ### `trace_call_flow`
