@@ -4,6 +4,10 @@ using Microsoft.Extensions.Logging;
 
 namespace RoslynMcp.Infrastructure.Navigation;
 
+/// <summary>
+/// Resolves type hierarchies: base types, derived types, and implementing types.
+/// Provides type introspection for inheritance analysis.
+/// </summary>
 internal sealed class NavigationTypeHierarchyService(
     NavigationSolutionProvider solutionProvider,
     ISymbolLookupService symbolLookupService,

@@ -7,6 +7,10 @@ using RoslynMcp.Infrastructure.Agent;
 
 namespace RoslynMcp.Infrastructure.Navigation;
 
+/// <summary>
+/// Builds call graphs: finds callers (incoming) and callees (outgoing) of a symbol.
+/// Supports depth-limited traversal for tracing execution paths.
+/// </summary>
 internal sealed class CallGraphService : ICallGraphService
 {
     public bool IsValidDirection(string direction)

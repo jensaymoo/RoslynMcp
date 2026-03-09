@@ -7,6 +7,10 @@ using Microsoft.CodeAnalysis;
 
 namespace RoslynMcp.Infrastructure.Agent.Handlers;
 
+/// <summary>
+/// Explains a symbol: returns signature, XML docs, outline, and key references.
+/// Aggregates navigation data for AI agent context.
+/// </summary>
 internal sealed class ExplainSymbolHandler(
     CodeUnderstandingQueryService queries,
     INavigationService navigationService,

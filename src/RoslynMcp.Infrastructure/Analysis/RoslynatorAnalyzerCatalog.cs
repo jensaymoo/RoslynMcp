@@ -6,6 +6,10 @@ using System.Runtime.Loader;
 
 namespace RoslynMcp.Infrastructure.Analysis;
 
+/// <summary>
+/// Loads Roslynator analyzers from NuGet package or custom path.
+/// Provides catalog of ~100+ code quality analyzers.
+/// </summary>
 internal sealed class RoslynatorAnalyzerCatalog : IRoslynAnalyzerCatalog
 {
     private const string RoslynatorAnalyzerPackageId = "roslynator.analyzers";

@@ -4,6 +4,10 @@ using System.Reflection;
 
 namespace RoslynMcp.Infrastructure.Analysis;
 
+/// <summary>
+/// Factory for creating stable symbol IDs from Roslyn ISymbol instances.
+/// Uses Roslyn's internal SymbolKey.CreateString for serialization.
+/// </summary>
 internal sealed class RoslynSymbolIdFactory : IRoslynSymbolIdFactory
 {
     private static readonly MethodInfo CreateString;

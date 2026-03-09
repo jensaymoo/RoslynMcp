@@ -5,6 +5,10 @@ using Microsoft.CodeAnalysis.FindSymbols;
 
 namespace RoslynMcp.Infrastructure.Navigation;
 
+/// <summary>
+/// Performs reference search using Roslyn's SymbolFinder.
+/// Handles document/project/solution scoped reference lookup.
+/// </summary>
 internal sealed class ReferenceSearchService : IReferenceSearchService
 {
     public bool IsValidScope(string scope)

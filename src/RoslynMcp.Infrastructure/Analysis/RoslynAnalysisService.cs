@@ -7,6 +7,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace RoslynMcp.Infrastructure.Analysis;
 
+/// <summary>
+/// Central analysis service: orchestrates diagnostics, metrics, and scope resolution.
+/// Combines diagnostics runner and metrics collector for unified analysis results.
+/// </summary>
 public sealed class RoslynAnalysisService : IAnalysisService
 {
     private readonly IRoslynSolutionAccessor _solutionAccessor;

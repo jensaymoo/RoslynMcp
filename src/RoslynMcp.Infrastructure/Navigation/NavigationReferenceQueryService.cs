@@ -4,6 +4,10 @@ using Microsoft.Extensions.Logging;
 
 namespace RoslynMcp.Infrastructure.Navigation;
 
+/// <summary>
+/// Finds all references to a symbol within solution, project, or document scope.
+/// Returns locations with line/column info.
+/// </summary>
 internal sealed class NavigationReferenceQueryService(
     NavigationSolutionProvider solutionProvider,
     ISymbolLookupService symbolLookupService,

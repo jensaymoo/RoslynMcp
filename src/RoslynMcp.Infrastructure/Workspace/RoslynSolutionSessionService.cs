@@ -7,6 +7,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace RoslynMcp.Infrastructure.Workspace;
 
+/// <summary>
+/// Manages solution sessions: tracks current solution, handles loading/discovery.
+/// Provides unified interface for solution access across services.
+/// </summary>
 public sealed class RoslynSolutionSessionService : ISolutionSessionService, IRoslynSolutionAccessor
 {
     private readonly ISessionStateStore _stateStore;

@@ -5,6 +5,10 @@ using Microsoft.Extensions.Logging;
 
 namespace RoslynMcp.Infrastructure.Navigation;
 
+/// <summary>
+/// Resolves and finds symbols by symbolId or text search.
+/// Core navigation service for symbol lookup.
+/// </summary>
 internal sealed class NavigationSymbolQueryService(
     NavigationSolutionProvider solutionProvider,
     ISymbolLookupService symbolLookupService,

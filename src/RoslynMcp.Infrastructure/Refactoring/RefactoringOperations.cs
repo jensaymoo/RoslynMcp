@@ -7,6 +7,10 @@ using System.Diagnostics;
 
 namespace RoslynMcp.Infrastructure.Refactoring;
 
+/// <summary>
+/// Executes code fixes and refactorings at text positions.
+/// Supports Roslynator analyzers, code fixes, and code refactorings.
+/// </summary>
 internal sealed class RefactoringActionOperations
 {
     private readonly RefactoringOperationOrchestrator _owner;
@@ -307,6 +311,9 @@ internal sealed class CodeFixOperations
 {
     private readonly RefactoringOperationOrchestrator _owner;
 
+    /// <summary>
+    /// Gets and applies code fixes from Roslyn analyzers at text positions.
+    /// </summary>
     public CodeFixOperations(RefactoringOperationOrchestrator owner)
     {
         _owner = owner;
@@ -487,6 +494,9 @@ internal sealed class CleanupOperations
 {
     private readonly RefactoringOperationOrchestrator _owner;
 
+    /// <summary>
+    /// Executes code cleanup: removes unused usings, organizes imports, formats document.
+    /// </summary>
     public CleanupOperations(RefactoringOperationOrchestrator owner)
     {
         _owner = owner;
@@ -666,6 +676,9 @@ internal sealed class RenameOperations
 {
     private readonly RefactoringOperationOrchestrator _owner;
 
+    /// <summary>
+    /// Renames symbols with proper update of all references.
+    /// </summary>
     public RenameOperations(RefactoringOperationOrchestrator owner)
     {
         _owner = owner;

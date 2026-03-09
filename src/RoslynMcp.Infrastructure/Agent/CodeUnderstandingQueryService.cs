@@ -7,6 +7,10 @@ using Microsoft.CodeAnalysis;
 
 namespace RoslynMcp.Infrastructure.Agent;
 
+/// <summary>
+/// Query service for code understanding: resolves solutions, symbols, and provides auto-bootstrap.
+/// Used by all handlers to access Roslyn solution data.
+/// </summary>
 internal sealed class CodeUnderstandingQueryService(
     IRoslynSolutionAccessor solutionAccessor,
     ISolutionSessionService solutionSessionService,

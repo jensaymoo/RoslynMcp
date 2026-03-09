@@ -4,6 +4,10 @@ using System.Collections.Immutable;
 
 namespace RoslynMcp.Infrastructure.Navigation;
 
+/// <summary>
+/// Finds polymorphic implementations: derived types that implement or override a given symbol.
+/// Handles interfaces, abstract methods, and virtual members.
+/// </summary>
 internal static class PolymorphicImplementationDiscovery
 {
     public static async Task<IReadOnlyList<ISymbol>> FindImplementationSymbolsAsync(ISymbol symbol, Solution solution, CancellationToken ct)

@@ -2,6 +2,10 @@ using Microsoft.Build.Locator;
 
 namespace RoslynMcp.Infrastructure.Workspace;
 
+/// <summary>
+/// Ensures MSBuild is registered for Roslyn workspace operations.
+/// Thread-safe singleton pattern for locator initialization.
+/// </summary>
 internal sealed class MsBuildRegistrationGate : IMSBuildRegistrationGate
 {
     private static readonly object s_msbuildLock = new();

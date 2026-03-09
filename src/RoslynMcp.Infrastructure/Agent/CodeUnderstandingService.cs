@@ -7,6 +7,10 @@ using RoslynMcp.Infrastructure.Workspace;
 
 namespace RoslynMcp.Infrastructure.Agent;
 
+/// <summary>
+/// Central orchestration for code understanding operations.
+/// Aggregates handlers for list_types, list_members, explain_symbol, and dependencies.
+/// </summary>
 internal sealed class CodeUnderstandingService : ICodeUnderstandingService
 {
     private readonly UnderstandCodebaseHandler _understandCodebaseHandler;

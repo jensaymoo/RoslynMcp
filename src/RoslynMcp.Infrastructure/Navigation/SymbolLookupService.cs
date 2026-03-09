@@ -4,6 +4,10 @@ using Microsoft.CodeAnalysis.FindSymbols;
 
 namespace RoslynMcp.Infrastructure.Navigation;
 
+/// <summary>
+/// Resolves symbol IDs back to Roslyn ISymbol instances.
+/// Searches across all compilations in the solution.
+/// </summary>
 internal sealed class SymbolLookupService : ISymbolLookupService
 {
     public async Task<ISymbol?> ResolveSymbolAsync(string symbolId, Solution solution, CancellationToken ct)

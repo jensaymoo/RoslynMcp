@@ -5,6 +5,10 @@ using Microsoft.Extensions.Logging;
 
 namespace RoslynMcp.Infrastructure.Refactoring;
 
+/// <summary>
+/// Public facade for refactoring operations: get fixes, apply refactorings, run cleanup.
+/// Wraps the refactoring operation orchestrator.
+/// </summary>
 public sealed class RoslynRefactoringService : IRefactoringService
 {
     private readonly IRefactoringOperationOrchestrator _orchestrator;

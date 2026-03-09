@@ -5,6 +5,10 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace RoslynMcp.Infrastructure.Analysis;
 
+/// <summary>
+/// Collects code metrics: cyclomatic complexity, lines of code, member counts.
+/// Walks syntax trees to compute per-type and per-member metrics.
+/// </summary>
 internal sealed class AnalysisMetricsCollector(IRoslynSymbolIdFactory symbolIdFactory) : IAnalysisMetricsCollector
 {
     private readonly IRoslynSymbolIdFactory _symbolIdFactory = symbolIdFactory ?? throw new ArgumentNullException(nameof(symbolIdFactory));

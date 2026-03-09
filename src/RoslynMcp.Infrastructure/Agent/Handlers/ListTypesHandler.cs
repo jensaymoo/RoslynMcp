@@ -6,6 +6,10 @@ using RoslynMcp.Infrastructure.Navigation;
 
 namespace RoslynMcp.Infrastructure.Agent.Handlers;
 
+/// <summary>
+/// Lists types (class, record, interface, enum, struct) in the solution with optional filtering by accessibility.
+/// Returns type metadata including namespace, accessibility, and XML documentation summary.
+/// </summary>
 internal sealed class ListTypesHandler(
     CodeUnderstandingQueryService queries,
     ISymbolDocumentationProvider symbolDocumentationProvider)

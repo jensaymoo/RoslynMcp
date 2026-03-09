@@ -6,6 +6,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace RoslynMcp.Infrastructure.Navigation;
 
+/// <summary>
+/// Central navigation service: orchestrates symbol resolution, references, call graph, and type hierarchy.
+/// Aggregates all navigation queries under one interface.
+/// </summary>
 public sealed class RoslynNavigationService : INavigationService
 {
     private readonly NavigationSymbolQueryService _symbolQueries;

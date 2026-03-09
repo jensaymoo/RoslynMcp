@@ -7,6 +7,10 @@ using RoslynMcp.Infrastructure.Workspace;
 
 namespace RoslynMcp.Infrastructure.Agent;
 
+/// <summary>
+/// Traces call flow between symbols: upstream (who calls this) and downstream (what does this call).
+/// Builds call graph edges with project/namespace context.
+/// </summary>
 public sealed class FlowTraceService(INavigationService navigationService, IRoslynSolutionAccessor solutionAccessor) : IFlowTraceService
 {
     private const string UnresolvedProjectLabel = "unresolved_project";

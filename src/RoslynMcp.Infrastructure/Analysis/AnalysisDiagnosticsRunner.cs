@@ -7,6 +7,10 @@ using System.Collections.Immutable;
 
 namespace RoslynMcp.Infrastructure.Analysis;
 
+/// <summary>
+/// Runs Roslynator analyzers on projects and returns diagnostics.
+/// Uses analyzer catalog for rule discovery.
+/// </summary>
 internal sealed class AnalysisDiagnosticsRunner(IRoslynAnalyzerCatalog analyzerCatalog, ILogger? logger = null) : IAnalysisDiagnosticsRunner
 {
     private static bool _analyzerLoadLogged;

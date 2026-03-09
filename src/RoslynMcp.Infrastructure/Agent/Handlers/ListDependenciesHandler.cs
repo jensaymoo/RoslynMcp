@@ -4,6 +4,10 @@ using Microsoft.CodeAnalysis;
 
 namespace RoslynMcp.Infrastructure.Agent.Handlers;
 
+/// <summary>
+/// Lists project dependencies in outgoing, incoming, or both directions.
+/// Returns project metadata and dependency graph edges.
+/// </summary>
 internal sealed class ListDependenciesHandler
 {
     private readonly CodeUnderstandingQueryService _queries;

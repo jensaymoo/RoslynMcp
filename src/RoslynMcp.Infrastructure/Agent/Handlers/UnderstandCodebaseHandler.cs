@@ -3,6 +3,10 @@ using RoslynMcp.Core.Models;
 
 namespace RoslynMcp.Infrastructure.Agent.Handlers;
 
+/// <summary>
+/// Provides overview of codebase: lists types, shows structure, returns diagnostics summary.
+/// Used for initial project exploration by AI agents.
+/// </summary>
 internal sealed class UnderstandCodebaseHandler
 {
     private readonly CodeUnderstandingQueryService _queries;

@@ -3,6 +3,10 @@ using System.Collections.Immutable;
 
 namespace RoslynMcp.Infrastructure.Agent;
 
+/// <summary>
+/// Parses qualified symbol names into container segments and parameter types.
+/// Used for symbol resolution from user-provided identifiers.
+/// </summary>
 internal sealed class QualifiedSymbolQuery
 {
     private QualifiedSymbolQuery(

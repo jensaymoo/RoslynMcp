@@ -4,6 +4,10 @@ using RoslynMcp.Infrastructure.Navigation;
 
 namespace RoslynMcp.Infrastructure.Agent.Handlers;
 
+/// <summary>
+/// Resolves symbols by symbolId, source position, or qualified name.
+/// Returns symbol metadata including kind, accessibility, and location.
+/// </summary>
 internal sealed class ResolveSymbolHandler
 {
     private readonly CodeUnderstandingQueryService _queries;

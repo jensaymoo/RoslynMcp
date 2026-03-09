@@ -4,6 +4,10 @@ using RoslynMcp.Infrastructure.Workspace;
 
 namespace RoslynMcp.Infrastructure.Agent;
 
+/// <summary>
+/// Bootstraps workspace: discovers and loads solutions by path or directory scan.
+/// Handles MSBuild registration and solution loading with readiness checks.
+/// </summary>
 public sealed class WorkspaceBootstrapService(
     ISolutionSessionService solutionSessionService,
     IAnalysisService analysisService,

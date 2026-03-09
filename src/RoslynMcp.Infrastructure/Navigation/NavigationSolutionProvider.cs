@@ -6,6 +6,10 @@ using Microsoft.Extensions.Logging;
 
 namespace RoslynMcp.Infrastructure.Navigation;
 
+/// <summary>
+/// Provides access to the current Roslyn Solution for navigation operations.
+/// Wraps solution accessor with error handling.
+/// </summary>
 internal sealed class NavigationSolutionProvider(IRoslynSolutionAccessor solutionAccessor, ILogger logger)
 {
     private readonly IRoslynSolutionAccessor _solutionAccessor = solutionAccessor ?? throw new ArgumentNullException(nameof(solutionAccessor));

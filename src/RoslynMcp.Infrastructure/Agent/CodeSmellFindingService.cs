@@ -12,6 +12,10 @@ using System.Text;
 
 namespace RoslynMcp.Infrastructure.Agent;
 
+/// <summary>
+/// Finds code smells in the codebase using Roslynator analyzers.
+/// Aggregates diagnostics by risk level (low, review_required, high) and category.
+/// </summary>
 public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAccessor, IRefactoringService refactoringService)
     : ICodeSmellFindingService
 {

@@ -18,6 +18,10 @@ using System.Diagnostics;
 
 namespace RoslynMcp.Infrastructure.Refactoring;
 
+/// <summary>
+/// Orchestrates refactoring operations: applies fixes, runs cleanup, handles workspace reload.
+/// Coordinates between Roslyn code actions and solution management.
+/// </summary>
 internal sealed class RefactoringOperationOrchestrator : IRefactoringOperationOrchestrator
 {
     internal const string SupportedFixOperation = "remove_unused_local";

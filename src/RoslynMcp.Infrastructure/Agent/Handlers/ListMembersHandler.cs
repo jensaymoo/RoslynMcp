@@ -3,6 +3,10 @@ using RoslynMcp.Core.Models;
 
 namespace RoslynMcp.Infrastructure.Agent.Handlers;
 
+/// <summary>
+/// Lists members (method, property, field, event, constructor) of a type with optional inheritance traversal.
+/// Filters by member kind and accessibility.
+/// </summary>
 internal sealed class ListMembersHandler
 {
     private readonly CodeUnderstandingQueryService _queries;
