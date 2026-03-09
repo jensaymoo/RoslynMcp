@@ -11,7 +11,7 @@ public sealed class ExplainSymbolTool(ICodeUnderstandingService codeUnderstandin
     private readonly ICodeUnderstandingService _codeUnderstandingService = codeUnderstandingService ?? throw new ArgumentNullException(nameof(codeUnderstandingService));
 
     [McpServerTool(Name = "explain_symbol", Title = "Explain Symbol", ReadOnly = true, Idempotent = true)]
-    [Description("Use this tool when you need to understand what a specific symbol (type, method, property, field, etc.) does, what its signature looks like, and where it is used in the codebase. It provides a human-readable explanation along with impact hints showing areas with high reference density.")]
+    [Description("Use this tool when you need to understand what a specific symbol (type, method, property, field, etc.) does, what its signature looks like, where it is used in the codebase, and what XML documentation it already exposes. It provides a human-readable explanation along with impact hints showing areas with high reference density.")]
     public Task<ExplainSymbolResult> ExecuteAsync(CancellationToken cancellationToken,
         [Description("The stable symbol ID, obtained from resolve_symbol, list_types, or list_members. Provide this OR path+line+column.")]
         string? symbolId = null,

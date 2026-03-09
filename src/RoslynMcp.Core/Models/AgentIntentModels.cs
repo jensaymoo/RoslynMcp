@@ -96,6 +96,7 @@ public sealed record ListTypesRequest(
     string? NamespacePrefix = null,
     string? Kind = null,
     string? Accessibility = null,
+    bool IncludeSummary = false,
     int? Limit = null,
     int? Offset = null);
 
@@ -108,6 +109,7 @@ public sealed record TypeListEntry(
     string Kind,
     bool IsPartial,
     int? Arity,
+    string? Summary = null,
     SymbolReference? Reference = null);
 
 public sealed record ListTypesResult(
@@ -222,12 +224,22 @@ public sealed record ExplainSymbolRequest(string? SymbolId = null, string? Path 
 
 public sealed record ImpactHint(string Zone, string Reason, int ReferenceCount);
 
+public sealed record SymbolDocumentationParameter(
+    string Name,
+    string Description);
+
+public sealed record SymbolDocumentationInfo(
+    string? Summary = null,
+    string? Returns = null,
+    IReadOnlyList<SymbolDocumentationParameter>? Parameters = null);
+
 public sealed record ExplainSymbolResult(
     SymbolDescriptor? Symbol,
     string RoleSummary,
     string Signature,
     IReadOnlyList<string> KeyReferences,
     IReadOnlyList<ImpactHint> ImpactHints,
+    SymbolDocumentationInfo? Documentation = null,
     ErrorInfo? Error = null);
 
 public sealed record FlowTransition(

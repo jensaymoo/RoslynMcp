@@ -25,6 +25,7 @@ public abstract class SharedToolTests<TTool> where TTool : notnull
     protected string AppOrchestratorPath => Context.GetFilePath("ProjectApp", "AppOrchestrator");
     protected string HierarchyPath => Context.GetFilePath("ProjectCore", "Hierarchy");
     protected string ContractsPath => Context.GetFilePath("ProjectCore", "Contracts");
+    protected string DocumentationPath => Context.GetFilePath("ProjectCore", "Documentation");
 
     protected string GetFilePath(string project, string file) => Context.GetFilePath(project, file);
 

@@ -1,12 +1,13 @@
 using RoslynMcp.Core.Contracts;
 using RoslynMcp.Core.Models;
 using RoslynMcp.Infrastructure.Agent.Handlers;
+using RoslynMcp.Infrastructure.Documentation;
 using RoslynMcp.Infrastructure.Navigation;
 using RoslynMcp.Infrastructure.Workspace;
 
 namespace RoslynMcp.Infrastructure.Agent;
 
-public sealed class CodeUnderstandingService : ICodeUnderstandingService
+internal sealed class CodeUnderstandingService : ICodeUnderstandingService
 {
     private readonly UnderstandCodebaseHandler _understandCodebaseHandler;
     private readonly ListTypesHandler _listTypesHandler;
@@ -22,7 +23,8 @@ public sealed class CodeUnderstandingService : ICodeUnderstandingService
         IWorkspaceBootstrapService workspaceBootstrapService,
         IAnalysisService analysisService,
         INavigationService navigationService,
-        ISymbolLookupService symbolLookupService)
+        ISymbolLookupService symbolLookupService,
+        ISymbolDocumentationProvider symbolDocumentationProvider)
     {
         var queries = new CodeUnderstandingQueryService(
             solutionAccessor,
@@ -32,11 +34,11 @@ public sealed class CodeUnderstandingService : ICodeUnderstandingService
             navigationService);
 
         _understandCodebaseHandler = new UnderstandCodebaseHandler(queries, analysisService);
-        _listTypesHandler = new ListTypesHandler(queries);
+        _listTypesHandler = new ListTypesHandler(queries, symbolDocumentationProvider);
         _listMembersHandler = new ListMembersHandler(queries);
         _resolveSymbolHandler = new ResolveSymbolHandler(queries, symbolLookupService);
         _resolveSymbolsBatchHandler = new ResolveSymbolsBatchHandler(_resolveSymbolHandler);
-        _explainSymbolHandler = new ExplainSymbolHandler(queries, navigationService, solutionAccessor, symbolLookupService);
+        _explainSymbolHandler = new ExplainSymbolHandler(queries, navigationService, solutionAccessor, symbolLookupService, symbolDocumentationProvider);
         _listDependenciesHandler = new ListDependenciesHandler(queries);
     }
 

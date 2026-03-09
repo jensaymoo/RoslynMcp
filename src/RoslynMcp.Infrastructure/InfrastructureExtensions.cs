@@ -1,5 +1,6 @@
 using RoslynMcp.Core.Contracts;
 using RoslynMcp.Infrastructure.Agent;
+using RoslynMcp.Infrastructure.Documentation;
 using RoslynMcp.Infrastructure.Analysis;
 using RoslynMcp.Infrastructure.Navigation;
 using RoslynMcp.Infrastructure.Refactoring;
@@ -32,6 +33,7 @@ public static class InfrastructureExtensions
 		    .AddSingleton<ICallGraphService, CallGraphService>()
 		    .AddSingleton<ITypeIntrospectionService, TypeIntrospectionService>()
 		    .AddSingleton<INavigationService, RoslynNavigationService>()
+		    .AddSingleton<ISymbolDocumentationProvider, RoslynSymbolDocumentationProvider>()
 		    .AddSingleton<IRefactoringOperationOrchestrator, RefactoringOperationOrchestrator>()
 		    .AddSingleton<IRefactoringService, RoslynRefactoringService>()
 		    .AddSingleton<IAnalysisService, RoslynAnalysisService>()

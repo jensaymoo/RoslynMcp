@@ -1,5 +1,6 @@
 using RoslynMcp.Core.Contracts;
 using RoslynMcp.Core.Models;
+using RoslynMcp.Infrastructure.Documentation;
 using RoslynMcp.Infrastructure.Navigation;
 using RoslynMcp.Infrastructure.Workspace;
 using Microsoft.CodeAnalysis;
@@ -10,7 +11,8 @@ internal sealed class ExplainSymbolHandler(
     CodeUnderstandingQueryService queries,
     INavigationService navigationService,
     IRoslynSolutionAccessor solutionAccessor,
-    ISymbolLookupService symbolLookupService)
+    ISymbolLookupService symbolLookupService,
+    ISymbolDocumentationProvider symbolDocumentationProvider)
 {
     public async Task<ExplainSymbolResult> HandleAsync(ExplainSymbolRequest request, CancellationToken ct)
     {
@@ -22,12 +24,12 @@ internal sealed class ExplainSymbolHandler(
             ct).ConfigureAwait(false);
 
         if (bootstrapError != null)
-            return new ExplainSymbolResult(null, string.Empty, string.Empty, [], [], bootstrapError);
+            return new ExplainSymbolResult(null, string.Empty, string.Empty, [], [], null, bootstrapError);
 
         var symbolResult = await queries.ResolveSymbolAtRequestAsync(request.SymbolId, request.Path, request.Line, request.Column, ct).ConfigureAwait(false);
         if (symbolResult.Symbol == null)
         {
-            return new ExplainSymbolResult(null, string.Empty, string.Empty, [], [],
+            return new ExplainSymbolResult(null, string.Empty, string.Empty, [], [], null,
                 AgentErrorInfo.Normalize(symbolResult.Error, "Call explain_symbol with symbolId or path+line+column for an existing symbol."));
         }
 
@@ -48,7 +50,9 @@ internal sealed class ExplainSymbolHandler(
             .Select(group => new ImpactHint(group.Key, "high reference density", group.Count()))
             .ToArray();
 
-        var roleSummary = await BuildRoleSummaryAsync(symbolResult.Symbol, outline, references, ct).ConfigureAwait(false);
+        var symbol = await ResolveSymbolAsync(symbolResult.Symbol.SymbolId, ct).ConfigureAwait(false);
+        var roleSummary = BuildRoleSummary(symbolResult.Symbol, symbol, outline, references);
+        var documentation = symbol is null ? null : MapDocumentation(symbolDocumentationProvider.GetDocumentation(symbol));
 
         return new ExplainSymbolResult(
             symbolResult.Symbol,
@@ -56,25 +60,28 @@ internal sealed class ExplainSymbolHandler(
             signature.Signature,
             keyReferences,
             impactHints,
+            documentation,
             AgentErrorInfo.Normalize(signature.Error ?? outline.Error ?? references.Error,
                 "Retry explain_symbol for a resolvable symbol in the loaded solution."));
     }
 
-    private async Task<string> BuildRoleSummaryAsync(
-        SymbolDescriptor descriptor,
-        GetSymbolOutlineResult outline,
-        FindReferencesResult references,
-        CancellationToken ct)
+    private async Task<ISymbol?> ResolveSymbolAsync(string symbolId, CancellationToken ct)
     {
         var (solution, error) = await solutionAccessor.GetCurrentSolutionAsync(ct).ConfigureAwait(false);
         if (solution == null || error != null)
         {
-            return outline.Members.Count == 0
-                ? $"{descriptor.Kind} '{descriptor.Name}'."
-                : $"{descriptor.Kind} '{descriptor.Name}' with {outline.Members.Count} top-level members.";
+            return null;
         }
 
-        var symbol = await symbolLookupService.ResolveSymbolAsync(descriptor.SymbolId, solution, ct).ConfigureAwait(false);
+        return await symbolLookupService.ResolveSymbolAsync(symbolId, solution, ct).ConfigureAwait(false);
+    }
+
+    private static string BuildRoleSummary(
+        SymbolDescriptor descriptor,
+        ISymbol? symbol,
+        GetSymbolOutlineResult outline,
+        FindReferencesResult references)
+    {
         if (symbol == null)
         {
             return outline.Members.Count == 0
@@ -90,6 +97,27 @@ internal sealed class ExplainSymbolHandler(
             IFieldSymbol field => BuildFieldSummary(field, references),
             _ => BuildFallbackSummary(symbol, outline, references)
         };
+    }
+
+    private static SymbolDocumentationInfo? MapDocumentation(SymbolDocumentation? documentation)
+    {
+        if (documentation == null)
+        {
+            return null;
+        }
+
+        var parameters = documentation.Parameters.Count == 0
+            ? null
+            : documentation.Parameters
+                .Select(static parameter => new SymbolDocumentationParameter(parameter.Name, parameter.Description))
+                .ToArray();
+
+        if (documentation.Summary == null && documentation.Returns == null && parameters == null)
+        {
+            return null;
+        }
+
+        return new SymbolDocumentationInfo(documentation.Summary, documentation.Returns, parameters);
     }
 
     private static string BuildTypeSummary(INamedTypeSymbol symbol, GetSymbolOutlineResult outline, FindReferencesResult references)

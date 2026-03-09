@@ -1,11 +1,14 @@
 using RoslynMcp.Core;
 using RoslynMcp.Core.Models;
 using Microsoft.CodeAnalysis;
+using RoslynMcp.Infrastructure.Documentation;
 using RoslynMcp.Infrastructure.Navigation;
 
 namespace RoslynMcp.Infrastructure.Agent.Handlers;
 
-internal sealed class ListTypesHandler(CodeUnderstandingQueryService queries)
+internal sealed class ListTypesHandler(
+    CodeUnderstandingQueryService queries,
+    ISymbolDocumentationProvider symbolDocumentationProvider)
 {
     private static readonly ResultContextMetadata EmptyContext = new(SourceBiases.Unknown, ResultCompletenessStates.Degraded, [], []);
 
@@ -56,8 +59,8 @@ internal sealed class ListTypesHandler(CodeUnderstandingQueryService queries)
             return new ListTypesResult([], 0, EmptyContext, selectorError);
 
         var namespacePrefix = request.NamespacePrefix.NormalizeOptional();
-        var entries = new List<TypeListEntry>();
-        var generatedFallbackEntries = new List<TypeListEntry>();
+        var entries = new List<TypeDiscoveryEntry>();
+        var generatedFallbackEntries = new List<TypeDiscoveryEntry>();
         var selectedProjectDocumentPaths = new List<string?>();
         var degradedReasons = new HashSet<string>(StringComparer.Ordinal);
         var limitations = new List<string>();
@@ -114,15 +117,17 @@ internal sealed class ListTypesHandler(CodeUnderstandingQueryService queries)
                     kind,
                     type.IsPartial(),
                     type.Arity > 0 ? type.Arity : null,
+                    null,
                     reference);
+                var candidate = new TypeDiscoveryEntry(entry, type);
 
                 if (!SourceVisibility.ShouldIncludeInHumanResults(filePath))
                 {
-                    generatedFallbackEntries.Add(entry);
+                    generatedFallbackEntries.Add(candidate);
                     continue;
                 }
 
-                entries.Add(entry);
+                entries.Add(candidate);
             }
         }
 
@@ -137,18 +142,21 @@ internal sealed class ListTypesHandler(CodeUnderstandingQueryService queries)
         }
 
         var ordered = entries
-            .OrderBy(static item => item.Kind, StringComparer.Ordinal)
-            .ThenBy(static item => item.DisplayName, StringComparer.Ordinal)
-            .ThenBy(static item => item.Arity ?? 0)
-            .ThenBy(static item => item.SymbolId, StringComparer.Ordinal)
+            .OrderBy(static item => item.Entry.Kind, StringComparer.Ordinal)
+            .ThenBy(static item => item.Entry.DisplayName, StringComparer.Ordinal)
+            .ThenBy(static item => item.Entry.Arity ?? 0)
+            .ThenBy(static item => item.Entry.SymbolId, StringComparer.Ordinal)
             .ToArray();
 
         var (offset, limit) = request.Offset.NormalizePaging(request.Limit);
         var paged = ordered.Skip(offset).Take(limit).ToArray();
+        var returnedEntries = request.IncludeSummary
+            ? paged.Select(candidate => EnrichSummary(candidate, symbolDocumentationProvider)).ToArray()
+            : paged.Select(static candidate => candidate.Entry).ToArray();
 
         var selectedVisibility = SourceVisibility.AssessPaths(selectedProjectDocumentPaths);
         var returnedSourceBias = ordered.Length > 0
-            ? SourceVisibility.DetermineResultSourceBias(ordered.Select(static entry => entry.FilePath))
+            ? SourceVisibility.DetermineResultSourceBias(ordered.Select(static entry => entry.Entry.FilePath))
             : selectedVisibility.Visibility;
 
         if (ordered.Length == 0 && degradedReasons.Contains("missing_artifacts"))
@@ -172,7 +180,13 @@ internal sealed class ListTypesHandler(CodeUnderstandingQueryService queries)
             degradedReasons.OrderBy(static value => value, StringComparer.Ordinal).ToArray(),
             recommendedNextStep);
 
-        return new ListTypesResult(paged, ordered.Length, context);
+        return new ListTypesResult(returnedEntries, ordered.Length, context);
+    }
+
+    private static TypeListEntry EnrichSummary(TypeDiscoveryEntry candidate, ISymbolDocumentationProvider symbolDocumentationProvider)
+    {
+        var summary = symbolDocumentationProvider.GetDocumentation(candidate.Symbol)?.Summary;
+        return candidate.Entry with { Summary = summary };
     }
 
     private static string DetermineCompleteness(
@@ -198,4 +212,6 @@ internal sealed class ListTypesHandler(CodeUnderstandingQueryService queries)
 
         return ResultCompletenessStates.Complete;
     }
+
+    private sealed record TypeDiscoveryEntry(TypeListEntry Entry, INamedTypeSymbol Symbol);
 }
