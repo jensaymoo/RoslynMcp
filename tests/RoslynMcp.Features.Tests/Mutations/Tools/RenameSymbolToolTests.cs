@@ -36,9 +36,9 @@ public sealed class RenameSymbolToolTests(ITestOutputHelper output)
         result.ChangedFiles[1].ShouldEndWithPathSuffix(Path.Combine("ProjectCore", "Contracts.cs"));
         result.ChangedFiles[2].ShouldEndWithPathSuffix(Path.Combine("ProjectImpl", "WorkItemOperations.cs"));
 
-        ShouldContainAffectedLocation(result.AffectedLocations, Path.Combine("ProjectCore", "Contracts.cs"), 31);
-        ShouldContainAffectedLocation(result.AffectedLocations, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 6);
-        ShouldContainAffectedLocation(result.AffectedLocations, Path.Combine("ProjectImpl", "WorkItemOperations.cs"), 15);
+        result.AffectedLocations.ShouldContainAffectedLocation(Path.Combine("ProjectCore", "Contracts.cs"), 31);
+        result.AffectedLocations.ShouldContainAffectedLocation(Path.Combine("ProjectApp", "AppOrchestrator.cs"), 6);
+        result.AffectedLocations.ShouldContainAffectedLocation(Path.Combine("ProjectImpl", "WorkItemOperations.cs"), 15);
 
         var renamed = await resolver.ExecuteAsync(CancellationToken.None,
             qualifiedName: "ProjectCore.IRenamedWorkItemOperation",
@@ -148,9 +148,15 @@ public sealed class RenameSymbolToolTests(ITestOutputHelper output)
         finalResolution.Symbol.IsNotNull();
         finalResolution.Symbol!.DisplayName.Is("IWorkItemOperation");
     }
+}
 
-    private static void ShouldContainAffectedLocation(IReadOnlyList<SourceLocation> locations, string expectedFileName, int expectedLine)
+file static class AssertionExtensions
+{
+    extension(IReadOnlyList<SourceLocation> locations)
     {
-        locations.Any(location => location.FilePath.HasPathSuffix(expectedFileName) && location.Line == expectedLine).IsTrue();
+        internal void ShouldContainAffectedLocation(string expectedFileName, int expectedLine)
+        {
+            locations.Any(location => location.FilePath.HasPathSuffix(expectedFileName) && location.Line == expectedLine).IsTrue();
+        }
     }
 }

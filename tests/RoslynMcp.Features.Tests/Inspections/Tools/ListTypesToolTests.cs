@@ -133,21 +133,6 @@ public sealed class ListTypesToolTests(SharedSandboxFixture fixture, ITestOutput
     }
 }
 
-internal static class ListTypesToolTestAssertions
-{
-    public static void ShouldMatchTypes(this ListTypesResult result, int expectedTotalCount, params string[] expectedDisplayNames)
-    {
-        result.Error.ShouldBeNone();
-        result.TotalCount.Is(expectedTotalCount);
-        result.Types.Select(static type => type.DisplayName).Is(expectedDisplayNames);
-    }
-
-    public static void ShouldHaveError(this ListTypesResult result, string expectedCode, string expectedMessage)
-    {
-        result.Error.ShouldHaveCode(expectedCode);
-        result.Error!.Message.Is(expectedMessage);
-    }
-}
 
 public sealed class ListTypesToolIsolatedTests(ITestOutputHelper output)
     : IsolatedToolTests<ListTypesTool>(output)
@@ -233,5 +218,24 @@ public sealed class ListTypesToolIsolatedTests(ITestOutputHelper output)
         result.Context.ResultCompleteness.Is(ResultCompletenessStates.Degraded);
         result.Context.DegradedReasons.IsContaining("missing_artifacts");
         result.Context.RecommendedNextStep.IsNotNull();
+    }
+}
+
+file static class AssertionExtensions
+{
+    extension(ListTypesResult result)
+    {
+        internal void ShouldMatchTypes(int expectedTotalCount, params string[] expectedDisplayNames)
+        {
+            result.Error.ShouldBeNone();
+            result.TotalCount.Is(expectedTotalCount);
+            result.Types.Select(static type => type.DisplayName).Is(expectedDisplayNames);
+        }
+
+        internal void ShouldHaveError(string expectedCode, string expectedMessage)
+        {
+            result.Error.ShouldHaveCode(expectedCode);
+            result.Error!.Message.Is(expectedMessage);
+        }
     }
 }

@@ -26,7 +26,7 @@ public sealed class FindImplementationsToolTests(SharedSandboxFixture fixture, I
         result.Symbol.DeclarationLocation.FilePath.ShouldEndWithPathSuffix(Path.Combine("ProjectCore", "Hierarchy.cs"));
         result.Symbol.DeclarationLocation.Line.Is(3);
 
-        ShouldMatchImplementations(result.Implementations,
+        result.Implementations.ShouldMatchImplementations(
             ("BaseClass", "NamedType", Path.Combine("ProjectCore", "Hierarchy.cs"), 18, null),
             ("DerivedClass", "NamedType", Path.Combine("ProjectCore", "Hierarchy.cs"), 23, null),
             ("LeafClass", "NamedType", Path.Combine("ProjectCore", "Hierarchy.cs"), 28, null),
@@ -48,7 +48,7 @@ public sealed class FindImplementationsToolTests(SharedSandboxFixture fixture, I
         result.Symbol.Kind.Is("Method");
         result.Symbol.ContainingType.Is("global::ProjectCore.IWorker");
 
-        ShouldMatchImplementations(result.Implementations,
+        result.Implementations.ShouldMatchImplementations(
             ("Work", "Method", Path.Combine("ProjectCore", "Hierarchy.cs"), 20, "global::ProjectCore.BaseClass"),
             ("Work", "Method", Path.Combine("ProjectCore", "Hierarchy.cs"), 10, "global::ProjectCore.WorkerA"),
             ("Work", "Method", Path.Combine("ProjectCore", "Hierarchy.cs"), 15, "global::ProjectCore.WorkerB"),
@@ -67,7 +67,7 @@ public sealed class FindImplementationsToolTests(SharedSandboxFixture fixture, I
         result.Symbol!.Name.Is("ExecuteAsync");
         result.Symbol.Kind.Is("Method");
         result.Symbol.ContainingType.Is("global::ProjectCore.OperationBase<TInput>");
-        ShouldMatchImplementations(result.Implementations,
+        result.Implementations.ShouldMatchImplementations(
             ("ExecuteAsync", "Method", Path.Combine("ProjectImpl", "WorkItemOperations.cs"), 17, "global::ProjectImpl.FastWorkItemOperation"),
             ("ExecuteAsync", "Method", Path.Combine("ProjectImpl", "WorkItemOperations.cs"), 40, "global::ProjectImpl.SafeWorkItemOperation"));
     }
@@ -84,8 +84,7 @@ public sealed class FindImplementationsToolTests(SharedSandboxFixture fixture, I
         result.Symbol!.Name.Is("DelayAsync");
         result.Symbol.Kind.Is("Method");
         result.Symbol.ContainingType.Is("global::ProjectCore.OperationBase<TInput>");
-        ShouldMatchImplementations(result.Implementations,
-            ("DelayAsync", "Method", Path.Combine("ProjectImpl", "WorkItemOperations.cs"), 48, "global::ProjectImpl.SafeWorkItemOperation"));
+        result.Implementations.ShouldMatchImplementations(("DelayAsync", "Method", Path.Combine("ProjectImpl", "WorkItemOperations.cs"), 48, "global::ProjectImpl.SafeWorkItemOperation"));
     }
 
     [Fact]
@@ -149,20 +148,24 @@ public sealed class FindImplementationsToolTests(SharedSandboxFixture fixture, I
 
         return resolved.Symbol!.SymbolId;
     }
+}
 
-    private static void ShouldMatchImplementations(
-        IReadOnlyList<SymbolDescriptor> actual,
-        params (string Name, string Kind, string FileName, int Line, string? ContainingType)[] expected)
+file static class AssertionExtensions
+{
+    extension(IReadOnlyList<SymbolDescriptor> actual)
     {
-        actual.Count.Is(expected.Length);
-
-        for (var i = 0; i < expected.Length; i++)
+        internal void ShouldMatchImplementations(params (string Name, string Kind, string FileName, int Line, string? ContainingType)[] expected)
         {
-            actual[i].Name.Is(expected[i].Name);
-            actual[i].Kind.Is(expected[i].Kind);
-            actual[i].ContainingType.Is(expected[i].ContainingType);
-            actual[i].DeclarationLocation.FilePath.ShouldEndWithPathSuffix(expected[i].FileName);
-            actual[i].DeclarationLocation.Line.Is(expected[i].Line);
+            actual.Count.Is(expected.Length);
+
+            for (var i = 0; i < expected.Length; i++)
+            {
+                actual[i].Name.Is(expected[i].Name);
+                actual[i].Kind.Is(expected[i].Kind);
+                actual[i].ContainingType.Is(expected[i].ContainingType);
+                actual[i].DeclarationLocation.FilePath.ShouldEndWithPathSuffix(expected[i].FileName);
+                actual[i].DeclarationLocation.Line.Is(expected[i].Line);
+            }
         }
     }
 }

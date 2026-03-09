@@ -32,14 +32,14 @@ public sealed class TraceCallFlowToolTests(SharedSandboxFixture fixture, ITestOu
         result.Depth.Is(2);
         result.Edges.Count.Is(9);
 
-        AssertEdge(result.Edges, runAsync.Symbol.SymbolId, startAsync.Symbol!.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 20);
-        AssertEdge(result.Edges, runAsync.Symbol.SymbolId, executeFlowAsync.Symbol!.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 23);
-        AssertEdge(result.Edges, runAsync.Symbol.SymbolId, calculate.Symbol!.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 25);
-        AssertEdge(result.Edges, runAsync.Symbol.SymbolId, stop.Symbol!.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 27);
-        AssertEdge(result.Edges, startAsync.Symbol.SymbolId, changeState.Symbol!.SymbolId, Path.Combine("ProjectImpl", "ProcessingSession.Lifecycle.cs"), 7);
-        AssertEdge(result.Edges, stop.Symbol.SymbolId, changeState.Symbol.SymbolId, Path.Combine("ProjectImpl", "ProcessingSession.Lifecycle.cs"), 14);
+        result.Edges.AssertEdge(runAsync.Symbol.SymbolId, startAsync.Symbol!.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 20);
+        result.Edges.AssertEdge(runAsync.Symbol.SymbolId, executeFlowAsync.Symbol!.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 23);
+        result.Edges.AssertEdge(runAsync.Symbol.SymbolId, calculate.Symbol!.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 25);
+        result.Edges.AssertEdge(runAsync.Symbol.SymbolId, stop.Symbol!.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 27);
+        result.Edges.AssertEdge(startAsync.Symbol.SymbolId, changeState.Symbol!.SymbolId, Path.Combine("ProjectImpl", "ProcessingSession.Lifecycle.cs"), 7);
+        result.Edges.AssertEdge(stop.Symbol.SymbolId, changeState.Symbol.SymbolId, Path.Combine("ProjectImpl", "ProcessingSession.Lifecycle.cs"), 14);
 
-        var directEdge = GetEdge(result.Edges, runAsync.Symbol.SymbolId, startAsync.Symbol.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 20);
+        var directEdge = result.Edges.GetEdge(runAsync.Symbol.SymbolId, startAsync.Symbol.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 20);
         directEdge.EvidenceKind.Is(FlowEvidenceKinds.DirectStatic);
         directEdge.Uncertainties.IsNotNull();
         var directUncertainties = directEdge.Uncertainties!;
@@ -76,17 +76,17 @@ public sealed class TraceCallFlowToolTests(SharedSandboxFixture fixture, ITestOu
         depthOne.Direction.Is("upstream");
         depthOne.Depth.Is(1);
         depthOne.Edges.Count.Is(1);
-        AssertEdge(depthOne.Edges, runAsync.Symbol!.SymbolId, executeFlowAsync.Symbol.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 23);
+        depthOne.Edges.AssertEdge(runAsync.Symbol!.SymbolId, executeFlowAsync.Symbol.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 23);
 
         depthTwo.Error.ShouldBeNone();
         depthTwo.Direction.Is("upstream");
         depthTwo.Depth.Is(2);
         depthTwo.Edges.Count.Is(3);
-        AssertEdge(depthTwo.Edges, runAsync.Symbol.SymbolId, executeFlowAsync.Symbol.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 23);
-        AssertEdge(depthTwo.Edges, runFastAsync.Symbol!.SymbolId, runAsync.Symbol.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 80);
-        AssertEdge(depthTwo.Edges, runSafeAsync.Symbol!.SymbolId, runAsync.Symbol.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 85);
+        depthTwo.Edges.AssertEdge(runAsync.Symbol.SymbolId, executeFlowAsync.Symbol.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 23);
+        depthTwo.Edges.AssertEdge(runFastAsync.Symbol!.SymbolId, runAsync.Symbol.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 80);
+        depthTwo.Edges.AssertEdge(runSafeAsync.Symbol!.SymbolId, runAsync.Symbol.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 85);
         depthTwo.Transitions.Any(static transition => transition.FromProject == "unknown" || transition.ToProject == "unknown").IsFalse();
-        AssertTransition(depthTwo.Transitions, "ProjectApp", "ProjectApp", 3);
+        depthTwo.Transitions.AssertTransition("ProjectApp", "ProjectApp", 3);
     }
 
     [Fact]
@@ -107,12 +107,12 @@ public sealed class TraceCallFlowToolTests(SharedSandboxFixture fixture, ITestOu
         result.Depth.Is(2);
         result.Edges.Count.Is(4);
 
-        AssertEdge(result.Edges, runAsync.Symbol!.SymbolId, executeFlowAsync.Symbol.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 23);
-        AssertEdge(result.Edges, runFastAsync.Symbol!.SymbolId, runAsync.Symbol.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 80);
-        AssertEdge(result.Edges, runSafeAsync.Symbol!.SymbolId, runAsync.Symbol.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 85);
-        AssertEdge(result.Edges, executeFlowAsync.Symbol.SymbolId, operationExecuteAsync.Symbol!.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 56);
+        result.Edges.AssertEdge(runAsync.Symbol!.SymbolId, executeFlowAsync.Symbol.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 23);
+        result.Edges.AssertEdge(runFastAsync.Symbol!.SymbolId, runAsync.Symbol.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 80);
+        result.Edges.AssertEdge(runSafeAsync.Symbol!.SymbolId, runAsync.Symbol.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 85);
+        result.Edges.AssertEdge(executeFlowAsync.Symbol.SymbolId, operationExecuteAsync.Symbol!.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 56);
 
-        var dispatchEdge = GetEdge(result.Edges, executeFlowAsync.Symbol.SymbolId, operationExecuteAsync.Symbol.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 56);
+        var dispatchEdge = result.Edges.GetEdge(executeFlowAsync.Symbol.SymbolId, operationExecuteAsync.Symbol.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 56);
         dispatchEdge.EvidenceKind.Is(FlowEvidenceKinds.DirectStatic);
         dispatchEdge.Uncertainties.IsNotNull();
         var dispatchUncertainties = dispatchEdge.Uncertainties!;
@@ -126,8 +126,8 @@ public sealed class TraceCallFlowToolTests(SharedSandboxFixture fixture, ITestOu
         result.PossibleTargetEdges!.IsEmpty();
 
         result.Transitions.Any(static transition => transition.FromProject == "unknown" || transition.ToProject == "unknown").IsFalse();
-        AssertTransition(result.Transitions, "ProjectApp", "ProjectApp", 3);
-        AssertTransition(result.Transitions, "ProjectApp", "ProjectCore", 1);
+        result.Transitions.AssertTransition("ProjectApp", "ProjectApp", 3);
+        result.Transitions.AssertTransition("ProjectApp", "ProjectCore", 1);
     }
 
     [Fact]
@@ -248,31 +248,40 @@ public sealed class TraceCallFlowToolTests(SharedSandboxFixture fixture, ITestOu
         return new ResolvedSymbolSummaryResult(result.Symbol!);
     }
 
-    private static void AssertEdge(IReadOnlyList<CallEdge> edges, string fromSymbolId, string toSymbolId, string expectedFileSuffix, int expectedLine)
-    {
-        edges.Any(edge =>
-            edge.FromSymbolId == fromSymbolId &&
-            edge.ToSymbolId == toSymbolId &&
-            edge.Location.FilePath.HasPathSuffix(expectedFileSuffix) &&
-            edge.Location.Line == expectedLine).IsTrue();
-    }
-
-    private static CallEdge GetEdge(IReadOnlyList<CallEdge> edges, string fromSymbolId, string toSymbolId, string expectedFileSuffix, int expectedLine)
-        => edges.Single(edge =>
-            edge.FromSymbolId == fromSymbolId &&
-            edge.ToSymbolId == toSymbolId &&
-            edge.Location.FilePath.HasPathSuffix(expectedFileSuffix) &&
-            edge.Location.Line == expectedLine);
-
-    private static void AssertTransition(IReadOnlyList<FlowTransition> transitions, string fromProject, string toProject, int expectedCount)
-    {
-        transitions.Any(transition =>
-            transition.FromProject == fromProject &&
-            transition.ToProject == toProject &&
-            transition.Count == expectedCount).IsTrue();
-    }
-
     private sealed record ResolvedSymbolSummaryResult(ResolvedSymbolSummary Symbol);
+}
+
+file static class AssertionExtensions
+{
+    extension(IReadOnlyList<CallEdge> edges)
+    {
+        internal void AssertEdge(string fromSymbolId, string toSymbolId, string expectedFileSuffix, int expectedLine)
+        {
+            edges.Any(edge =>
+                edge.FromSymbolId == fromSymbolId &&
+                edge.ToSymbolId == toSymbolId &&
+                edge.Location.FilePath.HasPathSuffix(expectedFileSuffix) &&
+                edge.Location.Line == expectedLine).IsTrue();
+        }
+
+        internal CallEdge GetEdge(string fromSymbolId, string toSymbolId, string expectedFileSuffix, int expectedLine)
+            => edges.Single(edge =>
+                edge.FromSymbolId == fromSymbolId &&
+                edge.ToSymbolId == toSymbolId &&
+                edge.Location.FilePath.HasPathSuffix(expectedFileSuffix) &&
+                edge.Location.Line == expectedLine);
+    }
+
+    extension(IReadOnlyList<FlowTransition> transitions)
+    {
+        internal void AssertTransition(string fromProject, string toProject, int expectedCount)
+        {
+            transitions.Any(transition =>
+                transition.FromProject == fromProject &&
+                transition.ToProject == toProject &&
+                transition.Count == expectedCount).IsTrue();
+        }
+    }
 }
 
 public sealed class TraceCallFlowToolIsolatedTests(ITestOutputHelper output)

@@ -21,7 +21,7 @@ public sealed class ListMembersToolTests(SharedSandboxFixture fixture, ITestOutp
         result.Error.ShouldBeNone();
         result.IncludeInherited.Is(false);
         result.TotalCount.Is(5);
-        ShouldMatchMembers(result.Members,
+        result.Members.ShouldMatchMembers(
             ("ExecuteFlowAsync", "method", "private", false, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 54),
             ("OnStateChanged", "method", "private", false, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 67),
             ("OnStepCompleted", "method", "private", false, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 59),
@@ -37,7 +37,7 @@ public sealed class ListMembersToolTests(SharedSandboxFixture fixture, ITestOutp
         result.Error.ShouldBeNone();
         result.IncludeInherited.Is(false);
         result.TotalCount.Is(5);
-        ShouldMatchMembers(result.Members,
+        result.Members.ShouldMatchMembers(
             ("SampleId", "field", "private", true, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 8),
             ("_operation", "field", "private", false, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 10),
             ("_session", "field", "private", false, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 11),
@@ -58,7 +58,7 @@ public sealed class ListMembersToolTests(SharedSandboxFixture fixture, ITestOutp
 
         result.Error.ShouldBeNone();
         result.TotalCount.Is(2);
-        ShouldMatchMembers(result.Members,
+        result.Members.ShouldMatchMembers(
             ("RunAsync", "method", "public", false, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 15),
             ("RunReflectionPathAsync", "method", "public", false, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 34));
     }
@@ -77,7 +77,7 @@ public sealed class ListMembersToolTests(SharedSandboxFixture fixture, ITestOutp
         result.Error.ShouldBeNone();
         result.TotalCount.Is(4);
         result.Members.All(static member => !member.IsStatic).IsTrue();
-        ShouldMatchMembers(result.Members,
+        result.Members.ShouldMatchMembers(
             ("_operation", "field", "private", false, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 10),
             ("_session", "field", "private", false, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 11),
             ("_smells", "field", "private", false, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 12),
@@ -167,7 +167,7 @@ public sealed class ListMembersToolTests(SharedSandboxFixture fixture, ITestOutp
         pagedResult.Error.ShouldBeNone();
         pagedResult.TotalCount.Is(5);
 
-        ShouldMatchMembers(pagedResult.Members,
+        pagedResult.Members.ShouldMatchMembers(
             ("OnStateChanged", "method", "private", false, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 67),
             ("OnStepCompleted", "method", "private", false, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 59));
 
@@ -200,23 +200,28 @@ public sealed class ListMembersToolTests(SharedSandboxFixture fixture, ITestOutp
 
         return typeResult.Types.Single(type => type.DisplayName == typeDisplayName).SymbolId;
     }
+}
 
-    private static void ShouldMatchMembers(IReadOnlyList<MemberListEntry> actual,
-        params (string DisplayName, string Kind, string Accessibility, bool IsStatic, string FileName, int Line)[] expected)
+file static class AssertionExtensions
+{
+    extension(IReadOnlyList<MemberListEntry> actual)
     {
-        actual.Count.Is(expected.Length);
-
-        for (var i = 0; i < expected.Length; i++)
+        internal void ShouldMatchMembers(params (string DisplayName, string Kind, string Accessibility, bool IsStatic, string FileName, int Line)[] expected)
         {
-            actual[i].DisplayName.Is(expected[i].DisplayName);
-            actual[i].Kind.Is(expected[i].Kind);
-            actual[i].Accessibility.Is(expected[i].Accessibility);
-            actual[i].IsStatic.Is(expected[i].IsStatic);
-            actual[i].FilePath.ShouldEndWithPathSuffix(expected[i].FileName);
-            actual[i].Line.Is(expected[i].Line);
-            actual[i].SymbolId.ShouldNotBeEmpty();
-            actual[i].Reference.IsNotNull();
-            actual[i].Reference!.SymbolId.Is(actual[i].SymbolId);
+            actual.Count.Is(expected.Length);
+
+            for (var i = 0; i < expected.Length; i++)
+            {
+                actual[i].DisplayName.Is(expected[i].DisplayName);
+                actual[i].Kind.Is(expected[i].Kind);
+                actual[i].Accessibility.Is(expected[i].Accessibility);
+                actual[i].IsStatic.Is(expected[i].IsStatic);
+                actual[i].FilePath.ShouldEndWithPathSuffix(expected[i].FileName);
+                actual[i].Line.Is(expected[i].Line);
+                actual[i].SymbolId.ShouldNotBeEmpty();
+                actual[i].Reference.IsNotNull();
+                actual[i].Reference!.SymbolId.Is(actual[i].SymbolId);
+            }
         }
     }
 }

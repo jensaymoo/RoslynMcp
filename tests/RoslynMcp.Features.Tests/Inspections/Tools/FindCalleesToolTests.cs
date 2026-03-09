@@ -31,12 +31,12 @@ public sealed class FindCalleesToolTests(SharedSandboxFixture fixture, ITestOutp
         result.Edges.Count.Is(5);
         result.Edges.All(candidate => candidate.FromSymbolId == runAsync.SymbolId).IsTrue();
 
-        AssertEdge(result.Edges, runAsync.SymbolId, startAsync.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 20);
-        AssertEdge(result.Edges, runAsync.SymbolId, executeFlowAsync.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 23);
-        AssertEdge(result.Edges, runAsync.SymbolId, calculate.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 25);
-        AssertEdge(result.Edges, runAsync.SymbolId, stop.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 27);
+        result.Edges.AssertEdge(runAsync.SymbolId, startAsync.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 20);
+        result.Edges.AssertEdge(runAsync.SymbolId, executeFlowAsync.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 23);
+        result.Edges.AssertEdge(runAsync.SymbolId, calculate.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 25);
+        result.Edges.AssertEdge(runAsync.SymbolId, stop.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 27);
 
-        var directEdge = GetEdge(result.Edges, runAsync.SymbolId, startAsync.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 20);
+        var directEdge = result.Edges.GetEdge(runAsync.SymbolId, startAsync.SymbolId, Path.Combine("ProjectApp", "AppOrchestrator.cs"), 20);
         directEdge.EvidenceKind.Is(FlowEvidenceKinds.DirectStatic);
         directEdge.Uncertainties.IsNotNull();
         var uncertainties = directEdge.Uncertainties!;
@@ -81,20 +81,26 @@ public sealed class FindCalleesToolTests(SharedSandboxFixture fixture, ITestOutp
         result.Symbol.IsNotNull();
         return result.Symbol!;
     }
+}
 
-    private static void AssertEdge(IReadOnlyList<CallEdge> edges, string fromSymbolId, string toSymbolId, string expectedFileSuffix, int expectedLine)
+file static class AssertionExtensions
+{
+    extension(IReadOnlyList<CallEdge> edges)
     {
-        edges.Any(edge =>
-            edge.FromSymbolId == fromSymbolId &&
-            edge.ToSymbolId == toSymbolId &&
-            edge.Location.FilePath.HasPathSuffix(expectedFileSuffix) &&
-            edge.Location.Line == expectedLine).IsTrue();
-    }
+        internal void AssertEdge(string fromSymbolId, string toSymbolId, string expectedFileSuffix, int expectedLine)
+        {
+            edges.Any(edge =>
+                edge.FromSymbolId == fromSymbolId &&
+                edge.ToSymbolId == toSymbolId &&
+                edge.Location.FilePath.HasPathSuffix(expectedFileSuffix) &&
+                edge.Location.Line == expectedLine).IsTrue();
+        }
 
-    private static CallEdge GetEdge(IReadOnlyList<CallEdge> edges, string fromSymbolId, string toSymbolId, string expectedFileSuffix, int expectedLine)
-        => edges.Single(edge =>
-            edge.FromSymbolId == fromSymbolId &&
-            edge.ToSymbolId == toSymbolId &&
-            edge.Location.FilePath.HasPathSuffix(expectedFileSuffix) &&
-            edge.Location.Line == expectedLine);
+        internal CallEdge GetEdge(string fromSymbolId, string toSymbolId, string expectedFileSuffix, int expectedLine)
+            => edges.Single(edge =>
+                edge.FromSymbolId == fromSymbolId &&
+                edge.ToSymbolId == toSymbolId &&
+                edge.Location.FilePath.HasPathSuffix(expectedFileSuffix) &&
+                edge.Location.Line == expectedLine);
+    }
 }

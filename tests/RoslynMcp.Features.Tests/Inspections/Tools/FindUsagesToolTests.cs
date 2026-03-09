@@ -23,7 +23,7 @@ public sealed class FindUsagesToolTests(SharedSandboxFixture fixture, ITestOutpu
         result.Symbol!.Name.Is("IWorkItemOperation");
         result.TotalCount.Is(4);
 
-        ShouldMatchReferences(result.References,
+        result.References.ShouldMatchReferences(
             (Path.Combine("ProjectApp", "AppOrchestrator.cs"), 6),
             (Path.Combine("ProjectApp", "AppOrchestrator.cs"), 10),
             (Path.Combine("ProjectImpl", "WorkItemOperations.cs"), 15),
@@ -54,7 +54,7 @@ public sealed class FindUsagesToolTests(SharedSandboxFixture fixture, ITestOutpu
         result.Symbol.IsNotNull();
         result.TotalCount.Is(2);
 
-        ShouldMatchReferences(result.References,
+        result.References.ShouldMatchReferences(
             (Path.Combine("ProjectApp", "AppOrchestrator.cs"), 6),
             (Path.Combine("ProjectApp", "AppOrchestrator.cs"), 10));
     }
@@ -117,15 +117,21 @@ public sealed class FindUsagesToolTests(SharedSandboxFixture fixture, ITestOutpu
 
         return resolved.Symbol!.SymbolId;
     }
+}
 
-    private static void ShouldMatchReferences(IReadOnlyList<SourceLocation> references, params (string FileName, int Line)[] expected)
+file static class AssertionExtensions
+{
+    extension(IReadOnlyList<SourceLocation> references)
     {
-        references.Count.Is(expected.Length);
-
-        for (var i = 0; i < expected.Length; i++)
+        internal void ShouldMatchReferences(params (string FileName, int Line)[] expected)
         {
-            references[i].FilePath.ShouldEndWithPathSuffix(expected[i].FileName);
-            references[i].Line.Is(expected[i].Line);
+            references.Count.Is(expected.Length);
+
+            for (var i = 0; i < expected.Length; i++)
+            {
+                references[i].FilePath.ShouldEndWithPathSuffix(expected[i].FileName);
+                references[i].Line.Is(expected[i].Line);
+            }
         }
     }
 }
