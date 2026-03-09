@@ -40,9 +40,6 @@ public static class HostExtensions
 
             builder.WithStdioServerTransport();
             builder.WithTools(FeatureExtensions.GetImplementations<Tool>(), serializerOptions);
-
-            services.AddSingleton<HostRuntime>();
-            services.AddHostedService(provider => provider.GetRequiredService<HostRuntime>());
         }
     }
 }
