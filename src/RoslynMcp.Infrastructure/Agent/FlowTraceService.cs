@@ -18,53 +18,23 @@ public sealed class FlowTraceService(INavigationService navigationService, IRosl
     public async Task<TraceFlowResult> TraceFlowAsync(TraceFlowRequest request, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var directionValidation = request.Direction.NormalizeFlowDirection();
-        if (directionValidation.Error != null)
-        {
-            return new TraceFlowResult(
-                null,
-                directionValidation.Direction,
-                Math.Max(request.Depth ?? 2, 1),
-                Array.Empty<CallEdge>(),
-                Array.Empty<CallEdge>(),
-                Array.Empty<FlowTransition>(),
-                Array.Empty<FlowUncertainty>(),
-                directionValidation.Error);
-        }
+        
+        var (direction, error) = request.Direction.NormalizeFlowDirection();
+        if (error != null)
+            return new TraceFlowResult(null, direction, Math.Max(request.Depth ?? 2, 1), [], [], [], [], error);
 
-        var direction = directionValidation.Direction;
         var depth = Math.Max(request.Depth ?? 2, 1);
 
         var root = await ResolveRootSymbolAsync(request, ct).ConfigureAwait(false);
         if (root.Symbol == null)
-        {
-            return new TraceFlowResult(
-                null,
-                direction,
-                depth,
-                Array.Empty<CallEdge>(),
-                Array.Empty<CallEdge>(),
-                Array.Empty<FlowTransition>(),
-                Array.Empty<FlowUncertainty>(),
-                AgentErrorInfo.Normalize(root.Error, "Call trace_flow with a resolvable symbolId or source position."));
-        }
+            return new TraceFlowResult(null, direction, depth, [], [], [], [], AgentErrorInfo.Normalize(root.Error, "Call trace_flow with a resolvable symbolId or source position."));
 
         IReadOnlyList<CallEdge> edges;
         if (string.Equals(direction, "upstream", StringComparison.Ordinal))
         {
             var callers = await _navigationService.GetCallersAsync(new GetCallersRequest(root.Symbol.SymbolId, depth), ct).ConfigureAwait(false);
             if (callers.Error != null)
-            {
-                return new TraceFlowResult(
-                    root.Symbol,
-                    direction,
-                    depth,
-                    Array.Empty<CallEdge>(),
-                    Array.Empty<CallEdge>(),
-                    Array.Empty<FlowTransition>(),
-                    Array.Empty<FlowUncertainty>(),
-                    AgentErrorInfo.Normalize(callers.Error, "Retry trace_flow with a resolvable symbol and supported upstream traversal depth."));
-            }
+                return new TraceFlowResult(root.Symbol, direction, depth, [], [], [], [], AgentErrorInfo.Normalize(callers.Error, "Retry trace_flow with a resolvable symbol and supported upstream traversal depth."));
 
             edges = callers.Callers;
         }
@@ -72,17 +42,7 @@ public sealed class FlowTraceService(INavigationService navigationService, IRosl
         {
             var callees = await _navigationService.GetCalleesAsync(new GetCalleesRequest(root.Symbol.SymbolId, depth), ct).ConfigureAwait(false);
             if (callees.Error != null)
-            {
-                return new TraceFlowResult(
-                    root.Symbol,
-                    direction,
-                    depth,
-                    Array.Empty<CallEdge>(),
-                    Array.Empty<CallEdge>(),
-                    Array.Empty<FlowTransition>(),
-                    Array.Empty<FlowUncertainty>(),
-                    AgentErrorInfo.Normalize(callees.Error, "Retry trace_flow with a resolvable symbol and supported downstream traversal depth."));
-            }
+                return new TraceFlowResult(root.Symbol, direction, depth, [], [], [], [], AgentErrorInfo.Normalize(callees.Error, "Retry trace_flow with a resolvable symbol and supported downstream traversal depth."));
 
             edges = callees.Callees;
         }
@@ -90,17 +50,7 @@ public sealed class FlowTraceService(INavigationService navigationService, IRosl
         {
             var graph = await _navigationService.GetCallGraphAsync(new GetCallGraphRequest(root.Symbol.SymbolId, "both", depth), ct).ConfigureAwait(false);
             if (graph.Error != null)
-            {
-                return new TraceFlowResult(
-                    root.Symbol,
-                    direction,
-                    depth,
-                    Array.Empty<CallEdge>(),
-                    Array.Empty<CallEdge>(),
-                    Array.Empty<FlowTransition>(),
-                    Array.Empty<FlowUncertainty>(),
-                    AgentErrorInfo.Normalize(graph.Error, "Retry trace_flow with a resolvable symbol and supported traversal depth."));
-            }
+                return new TraceFlowResult(root.Symbol, direction, depth, [], [], [], [], AgentErrorInfo.Normalize(graph.Error, "Retry trace_flow with a resolvable symbol and supported traversal depth."));
 
             edges = graph.Edges;
         }
@@ -130,9 +80,7 @@ public sealed class FlowTraceService(INavigationService navigationService, IRosl
             .Select(group => new FlowTransition(group.Key.From, group.Key.To, group.Count(), GetTransitionUncertaintyCategories(group.Key.From, group.Key.To)))
             .ToArray();
 
-        var possibleTargetEdges = request.IncludePossibleTargets
-            ? BuildPossibleTargetEdges(filteredEdges)
-            : Array.Empty<CallEdge>();
+        var possibleTargetEdges = request.IncludePossibleTargets ? BuildPossibleTargetEdges(filteredEdges) : [];
 
         return new TraceFlowResult(root.Symbol, direction, depth, filteredEdges, possibleTargetEdges, transitions, resultUncertainties);
     }
@@ -140,17 +88,13 @@ public sealed class FlowTraceService(INavigationService navigationService, IRosl
     private static IReadOnlyList<CallEdge> BuildPossibleTargetEdges(IReadOnlyList<CallEdge> edges)
     {
         if (edges.Count == 0)
-        {
-            return Array.Empty<CallEdge>();
-        }
+            return [];
 
         var unique = new Dictionary<string, CallEdge>(StringComparer.Ordinal);
         foreach (var edge in edges)
         {
             if (edge.PossibleTargets is null || edge.PossibleTargets.Count == 0)
-            {
                 continue;
-            }
 
             foreach (var target in edge.PossibleTargets)
             {
@@ -275,15 +219,13 @@ public sealed class FlowTraceService(INavigationService navigationService, IRosl
     private async Task<FindSymbolResult> ResolveRootSymbolAsync(TraceFlowRequest request, CancellationToken ct)
     {
         if (!string.IsNullOrWhiteSpace(request.SymbolId))
-        {
             return await _navigationService.FindSymbolAsync(new FindSymbolRequest(request.SymbolId), ct).ConfigureAwait(false);
-        }
 
-        if (!string.IsNullOrWhiteSpace(request.Path) && request.Line.HasValue && request.Column.HasValue)
+        if (!string.IsNullOrWhiteSpace(request.Path) && request is { Line: not null, Column: not null })
         {
-            var atPosition = await _navigationService.GetSymbolAtPositionAsync(
-                new GetSymbolAtPositionRequest(request.Path, request.Line.Value, request.Column.Value),
-                ct).ConfigureAwait(false);
+            var atPosition = await _navigationService.GetSymbolAtPositionAsync(new GetSymbolAtPositionRequest(request.Path, request.Line.Value, request.Column.Value), ct)
+                .ConfigureAwait(false);
+            
             return new FindSymbolResult(atPosition.Symbol, atPosition.Error);
         }
 
@@ -307,9 +249,7 @@ public sealed class FlowTraceService(INavigationService navigationService, IRosl
         {
             var facts = await ResolveSymbolFactsAsync(solution, symbolId, ct).ConfigureAwait(false);
             if (facts != null)
-            {
                 result[symbolId] = facts;
-            }
         }
 
         return result;
@@ -327,15 +267,11 @@ public sealed class FlowTraceService(INavigationService navigationService, IRosl
 
             var compilation = await project.GetCompilationAsync(ct).ConfigureAwait(false);
             if (compilation == null)
-            {
                 continue;
-            }
 
             var symbol = SymbolIdentity.Resolve(symbolId, compilation, ct);
             if (symbol == null)
-            {
                 continue;
-            }
 
             var normalized = symbol.OriginalDefinition ?? symbol;
 
@@ -355,35 +291,22 @@ public sealed class FlowTraceService(INavigationService navigationService, IRosl
             {
                 var document = solution.GetDocument(location.SourceTree!);
                 if (document != null)
-                {
                     sourceProjectNames.Add(document.Project.Name);
-                }
             }
         }
 
         if (string.IsNullOrWhiteSpace(declarationPath))
-        {
-            return resolvedWithoutSource
-                ? new SymbolFlowFacts(UnresolvedProjectLabel, null)
-                : null;
-        }
+            return resolvedWithoutSource ? new SymbolFlowFacts(UnresolvedProjectLabel, null) : null;
 
         if (!SourceVisibility.ShouldIncludeInInteractiveTrace(declarationPath))
-        {
             return null;
-        }
 
-        if (sourceProjectNames.Count == 1)
+        return sourceProjectNames.Count switch
         {
-            return new SymbolFlowFacts(sourceProjectNames.Single(), declarationPath);
-        }
-
-        if (sourceProjectNames.Count > 1)
-        {
-            return new SymbolFlowFacts(ProjectInferenceDegradedLabel, declarationPath);
-        }
-
-        return new SymbolFlowFacts(UnresolvedProjectLabel, declarationPath);
+            1 => new SymbolFlowFacts(sourceProjectNames.Single(), declarationPath),
+            > 1 => new SymbolFlowFacts(ProjectInferenceDegradedLabel, declarationPath),
+            _ => new SymbolFlowFacts(UnresolvedProjectLabel, declarationPath)
+        };
     }
 
     private static bool ShouldIncludeEdge(CallEdge edge, IReadOnlyDictionary<string, SymbolFlowFacts> symbolFacts)
@@ -408,7 +331,7 @@ public sealed class FlowTraceService(INavigationService navigationService, IRosl
             categories.Add(FlowUncertaintyCategories.ProjectInferenceDegraded);
         }
 
-        return categories.Count == 0 ? Array.Empty<string>() : categories.OrderBy(static category => category, StringComparer.Ordinal).ToArray();
+        return categories.Count == 0 ? [] : categories.OrderBy(static category => category, StringComparer.Ordinal).ToArray();
     }
 
     private async Task<ISymbol?> ResolveSymbolAsync(
@@ -418,27 +341,21 @@ public sealed class FlowTraceService(INavigationService navigationService, IRosl
         CancellationToken ct)
     {
         if (cache != null && cache.TryGetValue(symbolId, out var cached))
-        {
             return cached;
-        }
 
         foreach (var project in solution.Projects)
         {
             ct.ThrowIfCancellationRequested();
-            var compilation = await project.GetCompilationAsync(ct).ConfigureAwait(false);
-            if (compilation == null)
-            {
+            
+            if (await project.GetCompilationAsync(ct).ConfigureAwait(false) is not { } compilation)
                 continue;
-            }
 
-            var symbol = SymbolIdentity.Resolve(symbolId, compilation, ct);
-            if (symbol == null)
-            {
+            if (SymbolIdentity.Resolve(symbolId, compilation, ct) is not { } symbol)
                 continue;
-            }
 
             var resolved = symbol.OriginalDefinition ?? symbol;
             cache?.Add(symbolId, resolved);
+            
             return resolved;
         }
 
@@ -470,31 +387,21 @@ public sealed class FlowTraceService(INavigationService navigationService, IRosl
         foreach (var syntaxReference in symbol.DeclaringSyntaxReferences)
         {
             var node = await syntaxReference.GetSyntaxAsync(ct).ConfigureAwait(false);
-            var document = solution.GetDocument(node.SyntaxTree);
-            if (document == null)
-            {
+            
+            if(solution.GetDocument(node.SyntaxTree) is not {} document)
                 continue;
-            }
 
-            var model = await document.GetSemanticModelAsync(ct).ConfigureAwait(false);
-            if (model == null)
-            {
+            if(await document.GetSemanticModelAsync(ct).ConfigureAwait(false)is not {} model)
                 continue;
-            }
 
             foreach (var invocation in node.DescendantNodes().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax>())
             {
-                var target = model.GetSymbolInfo(invocation, ct).Symbol as IMethodSymbol;
-                if (target == null)
-                {
+                if(model.GetSymbolInfo(invocation, ct).Symbol  as IMethodSymbol is not {} target)
                     continue;
-                }
 
                 var containingType = target.ContainingType?.ToDisplayString();
                 if (containingType is "System.Type" or "System.Reflection.MethodInfo" or "System.Reflection.PropertyInfo" or "System.Reflection.FieldInfo" or "System.Activator")
-                {
                     return true;
-                }
             }
         }
 
@@ -506,24 +413,17 @@ public sealed class FlowTraceService(INavigationService navigationService, IRosl
         foreach (var syntaxReference in symbol.DeclaringSyntaxReferences)
         {
             var node = await syntaxReference.GetSyntaxAsync(ct).ConfigureAwait(false);
-            var document = solution.GetDocument(node.SyntaxTree);
-            if (document == null)
-            {
+            
+            if(solution.GetDocument(node.SyntaxTree) is not {}  document)
                 continue;
-            }
 
-            var model = await document.GetSemanticModelAsync(ct).ConfigureAwait(false);
-            if (model == null)
-            {
+            if(await document.GetSemanticModelAsync(ct).ConfigureAwait(false) is not {} model)
                 continue;
-            }
 
             foreach (var descendant in node.DescendantNodesAndSelf())
             {
                 if (model.GetTypeInfo(descendant, ct).Type?.TypeKind == TypeKind.Dynamic)
-                {
                     return true;
-                }
             }
         }
 

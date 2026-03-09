@@ -68,30 +68,16 @@ internal sealed class QualifiedSymbolQuery
 
     public bool Matches(ISymbol symbol)
     {
-        if (symbol.MatchesQualifiedName(NormalizedText))
-        {
-            return true;
-        }
-
-        if (MatchesType(symbol))
-        {
-            return true;
-        }
-
-        return MatchesMember(symbol);
+        return symbol.MatchesQualifiedName(NormalizedText) || MatchesType(symbol) || MatchesMember(symbol);
     }
 
     private bool MatchesType(ISymbol symbol)
     {
         if (HasExplicitParameterList || symbol is not INamedTypeSymbol namedType)
-        {
             return false;
-        }
 
         if (!FinalSegment.Matches(namedType.Name, namedType.Arity))
-        {
             return false;
-        }
 
         return ContainerSegments.Count == 0 || ContainerSegmentsMatch(namedType.GetQualifiedTypeSegments(includeSelf: false));
     }
@@ -99,24 +85,16 @@ internal sealed class QualifiedSymbolQuery
     private bool MatchesMember(ISymbol symbol)
     {
         if (symbol is INamedTypeSymbol or INamespaceSymbol)
-        {
             return false;
-        }
 
         if (!MatchesMemberName(symbol))
-        {
             return false;
-        }
 
         if (ContainerSegments.Count > 0 && !ContainerSegmentsMatch(symbol.GetQualifiedContainerSegments()))
-        {
             return false;
-        }
 
         if (!HasExplicitParameterList)
-        {
             return true;
-        }
 
         return symbol is IMethodSymbol method && ParametersMatch(method.Parameters);
     }
@@ -124,9 +102,7 @@ internal sealed class QualifiedSymbolQuery
     private bool MatchesMemberName(ISymbol symbol)
     {
         if (symbol is IMethodSymbol { MethodKind: MethodKind.Constructor } method)
-        {
             return string.Equals(method.ContainingType?.Name, FinalSegment.Name, StringComparison.Ordinal);
-        }
 
         return string.Equals(symbol.Name, FinalSegment.Name, StringComparison.Ordinal);
     }
@@ -134,16 +110,12 @@ internal sealed class QualifiedSymbolQuery
     private bool ParametersMatch(ImmutableArray<IParameterSymbol> parameters)
     {
         if (parameters.Length != ParameterTypes.Count)
-        {
             return false;
-        }
 
         for (var i = 0; i < parameters.Length; i++)
         {
             if (!ParameterTypeMatches(ParameterTypes[i], parameters[i].Type))
-            {
                 return false;
-            }
         }
 
         return true;
@@ -160,16 +132,12 @@ internal sealed class QualifiedSymbolQuery
     private bool ContainerSegmentsMatch(IReadOnlyList<QualifiedNameSegment> actualSegments)
     {
         if (actualSegments.Count != ContainerSegments.Count)
-        {
             return false;
-        }
 
         for (var i = 0; i < actualSegments.Count; i++)
         {
             if (!ContainerSegments[i].Matches(actualSegments[i].Name, actualSegments[i].GenericArity))
-            {
                 return false;
-            }
         }
 
         return true;

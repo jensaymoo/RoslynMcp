@@ -20,9 +20,7 @@ public sealed class TestSolutionSandbox : IDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(canonicalSolutionRoot);
 
         if (!Directory.Exists(canonicalSolutionRoot))
-        {
             throw new DirectoryNotFoundException($"Canonical test solution directory '{canonicalSolutionRoot}' does not exist.");
-        }
 
         var sandboxRoot = Path.Combine(Path.GetTempPath(), "RoslynMcp.FeatureTests", Guid.NewGuid().ToString("N"));
         var solutionRoot = Path.Combine(sandboxRoot, Path.GetFileName(canonicalSolutionRoot));
@@ -35,14 +33,10 @@ public sealed class TestSolutionSandbox : IDisposable
     public void Dispose()
     {
         if (!Directory.Exists(SandboxRoot))
-        {
             return;
-        }
 
         foreach (var filePath in Directory.EnumerateFiles(SandboxRoot, "*", SearchOption.AllDirectories))
-        {
             File.SetAttributes(filePath, FileAttributes.Normal);
-        }
 
         Directory.Delete(SandboxRoot, recursive: true);
     }
@@ -64,9 +58,7 @@ public sealed class TestSolutionSandbox : IDisposable
             var targetParent = Path.GetDirectoryName(targetPath);
 
             if (!string.IsNullOrEmpty(targetParent))
-            {
                 Directory.CreateDirectory(targetParent);
-            }
 
             File.Copy(filePath, targetPath, overwrite: false);
         }

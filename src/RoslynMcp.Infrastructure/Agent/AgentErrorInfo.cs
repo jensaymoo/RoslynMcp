@@ -13,14 +13,10 @@ internal static class AgentErrorInfo
     public static ErrorInfo? Normalize(ErrorInfo? error, string nextAction)
     {
         if (error == null)
-        {
             return null;
-        }
 
         if (error.Details != null && error.Details.TryGetValue("nextAction", out var existing) && !string.IsNullOrWhiteSpace(existing))
-        {
             return error;
-        }
 
         var map = new Dictionary<string, string>(StringComparer.Ordinal);
         if (error.Details != null)
@@ -28,9 +24,7 @@ internal static class AgentErrorInfo
             foreach (var pair in error.Details)
             {
                 if (!string.IsNullOrWhiteSpace(pair.Key) && !string.IsNullOrWhiteSpace(pair.Value))
-                {
                     map[pair.Key] = pair.Value;
-                }
             }
         }
 
@@ -48,9 +42,7 @@ internal static class AgentErrorInfo
         foreach (var (key, value) in details)
         {
             if (!string.IsNullOrWhiteSpace(key) && !string.IsNullOrWhiteSpace(value))
-            {
                 map[key] = value;
-            }
         }
 
         return map;

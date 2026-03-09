@@ -24,6 +24,7 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
         ResultCompletenessStates.Degraded,
         Array.Empty<string>(),
         Array.Empty<string>());
+   
     private static readonly CodeSmellsSummary EmptySummary = new(0, 0, 0, 0);
 
     private readonly IRoslynSolutionAccessor _solutionAccessor = solutionAccessor ?? throw new ArgumentNullException(nameof(solutionAccessor));
@@ -37,9 +38,7 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
 
         var (filters, validationError) = ValidateRequest(request);
         if (validationError is not null)
-        {
             return validationError;
-        }
 
         var path = filters!.Path;
 
@@ -129,9 +128,7 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
             }
 
             if (actionsAtAnchor.Length == 0)
-            {
                 continue;
-            }
 
             foreach (var action in actionsAtAnchor)
             {
@@ -146,9 +143,7 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
                     DetermineReviewKind(normalizedCategory, normalizedRiskLevel, action.Origin, action.Title));
 
                 if (!filters.Accepts(match))
-                {
                     continue;
-                }
 
                 actions.Add(match);
             }
@@ -179,13 +174,9 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
         {
             var syntaxRoot = await document.GetSyntaxRootAsync(ct).ConfigureAwait(false);
             if (syntaxRoot is null)
-            {
                 warnings.Add($"Skipped document without syntax root: {document.FilePath ?? document.Name}");
-            }
             else
-            {
                 declarationAnchors.AddRange(EnumerateDeclarationAnchors(syntaxRoot, document.FilePath));
-            }
         }
 
         var diagnosticAnchors = await EnumerateDiagnosticAnchorsAsync(document, ct).ConfigureAwait(false);
@@ -209,9 +200,7 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
         {
             var key = CreateAnchorDeduplicationKey(anchor);
             if (!seen.Add(key))
-            {
                 continue;
-            }
 
             deduplicated.Add(anchor);
         }
@@ -232,17 +221,13 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
         foreach (var node in syntaxRoot.DescendantNodes())
         {
             if (!IsDeclarationAnchorCandidate(node))
-            {
                 continue;
-            }
 
             var lineSpan = node.GetLocation().GetLineSpan();
             var start = lineSpan.StartLinePosition;
             var anchorPath = string.IsNullOrWhiteSpace(lineSpan.Path) ? normalizedPath : lineSpan.Path;
             if (string.IsNullOrWhiteSpace(anchorPath))
-            {
                 continue;
-            }
 
             yield return new AnchorPosition(
                 anchorPath,
@@ -257,15 +242,11 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
     {
         var compilation = await document.Project.GetCompilationAsync(ct).ConfigureAwait(false);
         if (compilation is null)
-        {
-            return Array.Empty<AnchorPosition>();
-        }
+            return [];
 
         var tree = await document.GetSyntaxTreeAsync(ct).ConfigureAwait(false);
         if (tree is null)
-        {
-            return Array.Empty<AnchorPosition>();
-        }
+            return [];
 
         var anchors = new List<AnchorPosition>();
 
@@ -287,14 +268,10 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
         foreach (var diagnostic in compilation.GetDiagnostics())
         {
             if (!diagnostic.Location.IsInSource || diagnostic.Location.SourceTree is null)
-            {
                 continue;
-            }
 
             if (!ReferenceEquals(diagnostic.Location.SourceTree, tree))
-            {
                 continue;
-            }
 
             anchors.Add(CreateDiagnosticAnchor(diagnostic));
         }
@@ -308,9 +285,7 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
 
         var (analyzers, analyzerError) = _analyzerCatalog.GetCatalog();
         if (analyzerError is not null || analyzers.IsDefaultOrEmpty)
-        {
             return anchors;
-        }
 
         try
         {
@@ -319,9 +294,7 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
             var analyzerDiagnostics = allDiagnostics.Where(d => d.Location.IsInSource && d.Location.SourceTree == tree);
 
             foreach (var diagnostic in analyzerDiagnostics)
-            {
                 anchors.Add(CreateDiagnosticAnchor(diagnostic));
-            }
         }
         catch (OperationCanceledException)
         {
@@ -358,9 +331,7 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
     {
         var path = NormalizePath(request.Path);
         if (path is null)
-        {
             return defaultError(CreateInvalidInputResult("path is required.", ("field", "path")));
-        }
 
         if (request.MaxFindings is <= 0)
         {
@@ -372,9 +343,7 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
 
         var (riskLevels, riskError) = NormalizeRiskLevels(request.RiskLevels);
         if (riskError is not null)
-        {
             return defaultError(riskError);
-        }
 
         var (categories, categoryError) = NormalizeCategories(request.Categories);
         if (categoryError is not null)
@@ -384,9 +353,7 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
 
         var (reviewMode, reviewModeError) = NormalizeReviewMode(request.ReviewMode);
         if (reviewModeError is not null)
-        {
             return defaultError(reviewModeError);
-        }
 
         return (new FindCodeSmellFilters(path, request.MaxFindings, riskLevels, categories, reviewMode), null);
 
@@ -400,9 +367,7 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
     private static (HashSet<string>? RiskLevels, FindCodeSmellsResult? Error) NormalizeRiskLevels(IReadOnlyList<string>? riskLevels)
     {
         if (riskLevels is null || riskLevels.Count == 0)
-        {
             return (null, null);
-        }
 
         var normalized = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 

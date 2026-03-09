@@ -22,9 +22,7 @@ public sealed class SharedSandboxFixture : IAsyncLifetime
     async Task IAsyncLifetime.DisposeAsync()
     {
         if (Context is null)
-        {
             return;
-        }
 
         await Context.DisposeAsync().ConfigureAwait(false);
     }
