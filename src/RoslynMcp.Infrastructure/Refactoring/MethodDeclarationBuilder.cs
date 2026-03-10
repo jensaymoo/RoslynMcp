@@ -205,6 +205,7 @@ internal sealed class MethodDeclarationBuilder
     private static BlockSyntax? ParseBodyBlock(string body)
     {
         var parsed = SyntaxFactory.ParseStatement("{" + Environment.NewLine + body + Environment.NewLine + "}") as BlockSyntax;
+
         if (parsed == null || HasSyntaxErrors(parsed))
         {
             return null;

@@ -19,7 +19,10 @@ public sealed class ReplaceMethodBodyToolTests(ITestOutputHelper output)
         var filePath = context.GetFilePath("ProjectApp", "MethodMutationTestTarget");
         var targetMethodSymbolId = await ResolveMethodSymbolIdAsync(context, filePath, 5, 19);
 
-        var result = await sut.ExecuteAsync(CancellationToken.None, targetMethodSymbolId, "return input + priority.ToString();");
+        var result = await sut.ExecuteAsync(
+            CancellationToken.None,
+            targetMethodSymbolId,
+            "var combined = input + priority.ToString();\\r\\nreturn combined;");
 
         result.Error.ShouldBeNone();
         result.Status.Is("applied");
@@ -32,7 +35,8 @@ public sealed class ReplaceMethodBodyToolTests(ITestOutputHelper output)
 
         var text = await File.ReadAllTextAsync(filePath);
         text.Contains("public string Evaluate(string input, int priority, bool isEnabled)", StringComparison.Ordinal).IsTrue();
-        text.Contains("return input + priority.ToString();", StringComparison.Ordinal).IsTrue();
+        text.Contains("var combined = input + priority.ToString();", StringComparison.Ordinal).IsTrue();
+        text.Contains("return combined;", StringComparison.Ordinal).IsTrue();
         text.Contains("return string.Empty;", StringComparison.Ordinal).IsFalse();
 
         var resolved = await resolver.ExecuteAsync(CancellationToken.None, symbolId: result.ReplacedMethodBody.MethodSymbolId);
@@ -111,7 +115,7 @@ public sealed class ReplaceMethodBodyToolTests(ITestOutputHelper output)
             "public",
             Array.Empty<string>(),
             ["string input", "int priority", "bool isEnabled"],
-            "return string.Empty;");
+            "var plan = string.Empty;\\nreturn plan;");
 
         addResult.Error.ShouldBeNone();
         addResult.Status.Is("applied");
@@ -119,7 +123,7 @@ public sealed class ReplaceMethodBodyToolTests(ITestOutputHelper output)
         var replaceResult = await replaceMethodBodyTool.ExecuteAsync(
             CancellationToken.None,
             targetMethodSymbolId,
-            "return input + \"-updated\";");
+            "var updated = input + \"-updated\";\\r\\nreturn updated;");
 
         replaceResult.Error.ShouldBeNone();
         replaceResult.Status.Is("applied");
@@ -127,7 +131,8 @@ public sealed class ReplaceMethodBodyToolTests(ITestOutputHelper output)
 
         var text = await File.ReadAllTextAsync(filePath);
         text.Contains("public string Plan(string input, int priority, bool isEnabled)", StringComparison.Ordinal).IsTrue();
-        text.Contains("return input + \"-updated\";", StringComparison.Ordinal).IsTrue();
+        text.Contains("var updated = input + \"-updated\";", StringComparison.Ordinal).IsTrue();
+        text.Contains("return updated;", StringComparison.Ordinal).IsTrue();
     }
 
     [Fact]

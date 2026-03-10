@@ -152,7 +152,7 @@ public static class ToolContractMapperExtensions
                     NormalizeString(accessibility),
                     NormalizeOptionalStrings(modifiers) ?? Array.Empty<string>(),
                     ParseMethodParameters(parameters),
-                    NormalizeString(body)));
+                    NormalizeString(body).NormalizeEscapedNewlines()));
 
         public DeleteMethodRequest ToDeleteMethodRequest()
             => new(NormalizeSymbolId(solutionHintPath));
@@ -172,10 +172,10 @@ public static class ToolContractMapperExtensions
                     NormalizeString(accessibility),
                     NormalizeOptionalStrings(modifiers) ?? Array.Empty<string>(),
                     ParseMethodParameters(parameters),
-                    NormalizeString(body)));
+                    NormalizeString(body).NormalizeEscapedNewlines()));
 
         public ReplaceMethodBodyRequest ToReplaceMethodBodyRequest(string? body)
-            => new(NormalizeSymbolId(solutionHintPath), NormalizeString(body));
+            => new(NormalizeSymbolId(solutionHintPath), NormalizeString(body).NormalizeEscapedNewlines());
     }
 
     private static int NormalizePosition(int value)

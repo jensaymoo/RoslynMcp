@@ -27,7 +27,7 @@ public sealed class ReplaceMethodToolTests(ITestOutputHelper output)
             "public",
             Array.Empty<string>(),
             ["string input", "int priority", "bool isEnabled", "string tag"],
-            "return tag;");
+            "var resultTag = tag;\\r\\nreturn resultTag;");
 
         result.Error.ShouldBeNone();
         result.Status.Is("applied");
@@ -42,7 +42,8 @@ public sealed class ReplaceMethodToolTests(ITestOutputHelper output)
 
         var text = await File.ReadAllTextAsync(filePath);
         text.Contains("public string Assess(string input, int priority, bool isEnabled, string tag)", StringComparison.Ordinal).IsTrue();
-        text.Contains("return tag;", StringComparison.Ordinal).IsTrue();
+        text.Contains("var resultTag = tag;", StringComparison.Ordinal).IsTrue();
+        text.Contains("return resultTag;", StringComparison.Ordinal).IsTrue();
         text.Contains("Evaluate", StringComparison.Ordinal).IsFalse();
 
         var oldResolution = await resolver.ExecuteAsync(CancellationToken.None, symbolId: targetMethodSymbolId);
@@ -68,7 +69,7 @@ public sealed class ReplaceMethodToolTests(ITestOutputHelper output)
             "public",
             Array.Empty<string>(),
             ["int priority"],
-            "return Task.FromResult(priority);");
+            "var task = Task.FromResult(priority);\\nreturn task;");
 
         result.Error.ShouldBeNone();
         result.Status.Is("applied");
@@ -78,7 +79,8 @@ public sealed class ReplaceMethodToolTests(ITestOutputHelper output)
 
         var text = await File.ReadAllTextAsync(filePath);
         text.Contains("public Task<int> AssessAsync(int priority)", StringComparison.Ordinal).IsTrue();
-        text.Contains("return Task.FromResult(priority);", StringComparison.Ordinal).IsTrue();
+        text.Contains("var task = Task.FromResult(priority);", StringComparison.Ordinal).IsTrue();
+        text.Contains("return task;", StringComparison.Ordinal).IsTrue();
         text.Contains("public string Evaluate", StringComparison.Ordinal).IsFalse();
     }
 
@@ -98,7 +100,7 @@ public sealed class ReplaceMethodToolTests(ITestOutputHelper output)
             "public",
             Array.Empty<string>(),
             ["Task&lt;int&gt; task"],
-            "return task;");
+            "var current = task;\\rreturn current;");
 
         result.Error.ShouldBeNone();
         result.Status.Is("applied");
@@ -108,7 +110,8 @@ public sealed class ReplaceMethodToolTests(ITestOutputHelper output)
 
         var text = await File.ReadAllTextAsync(filePath);
         text.Contains("public Task<int> AssessEscapedAsync(Task<int> task)", StringComparison.Ordinal).IsTrue();
-        text.Contains("return task;", StringComparison.Ordinal).IsTrue();
+        text.Contains("var current = task;", StringComparison.Ordinal).IsTrue();
+        text.Contains("return current;", StringComparison.Ordinal).IsTrue();
         text.Contains("public string Evaluate", StringComparison.Ordinal).IsFalse();
     }
 

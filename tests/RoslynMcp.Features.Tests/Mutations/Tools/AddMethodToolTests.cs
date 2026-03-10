@@ -27,7 +27,7 @@ public sealed class AddMethodToolTests(ITestOutputHelper output)
             "public",
             Array.Empty<string>(),
             ["string input", "int priority", "bool isEnabled"],
-            "return string.Empty;");
+            "var plan = string.Empty;\\r\\nreturn plan;");
 
         result.Error.ShouldBeNone();
         result.Status.Is("applied");
@@ -41,7 +41,8 @@ public sealed class AddMethodToolTests(ITestOutputHelper output)
 
         var text = await File.ReadAllTextAsync(filePath);
         text.Contains("public string Plan(string input, int priority, bool isEnabled)", StringComparison.Ordinal).IsTrue();
-        text.Contains("return string.Empty;", StringComparison.Ordinal).IsTrue();
+        text.Contains("var plan = string.Empty;", StringComparison.Ordinal).IsTrue();
+        text.Contains("return plan;", StringComparison.Ordinal).IsTrue();
     }
 
     [Fact]
@@ -60,7 +61,7 @@ public sealed class AddMethodToolTests(ITestOutputHelper output)
             "public",
             Array.Empty<string>(),
             ["int priority"],
-            "return Task.FromResult(priority);");
+            "var task = Task.FromResult(priority);\\nreturn task;");
 
         result.Error.ShouldBeNone();
         result.Status.Is("applied");
@@ -70,7 +71,8 @@ public sealed class AddMethodToolTests(ITestOutputHelper output)
 
         var text = await File.ReadAllTextAsync(filePath);
         text.Contains("public Task<int> PlanAsync(int priority)", StringComparison.Ordinal).IsTrue();
-        text.Contains("return Task.FromResult(priority);", StringComparison.Ordinal).IsTrue();
+        text.Contains("var task = Task.FromResult(priority);", StringComparison.Ordinal).IsTrue();
+        text.Contains("return task;", StringComparison.Ordinal).IsTrue();
     }
 
     [Fact]
@@ -89,7 +91,7 @@ public sealed class AddMethodToolTests(ITestOutputHelper output)
             "public",
             Array.Empty<string>(),
             ["Task&lt;int&gt; task"],
-            "return task;");
+            "var current = task;\\rreturn current;");
 
         result.Error.ShouldBeNone();
         result.Status.Is("applied");
@@ -99,7 +101,8 @@ public sealed class AddMethodToolTests(ITestOutputHelper output)
 
         var text = await File.ReadAllTextAsync(filePath);
         text.Contains("public Task<int> PlanEscapedAsync(Task<int> task)", StringComparison.Ordinal).IsTrue();
-        text.Contains("return task;", StringComparison.Ordinal).IsTrue();
+        text.Contains("var current = task;", StringComparison.Ordinal).IsTrue();
+        text.Contains("return current;", StringComparison.Ordinal).IsTrue();
     }
 
     [Fact]

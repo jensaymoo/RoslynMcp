@@ -19,7 +19,7 @@ public sealed class ListTypesToolTests(SharedSandboxFixture fixture, ITestOutput
         var project = Context.GetProject("ProjectApp");
         var result = await Sut.ExecuteAsync(CancellationToken.None, projectName: project.Name);
 
-        result.ShouldMatchTypes(2, "AppEntryPoints", "AppOrchestrator");
+        result.ShouldMatchTypes(3, "AppEntryPoints", "AppOrchestrator", "MethodMutationTestTarget");
     }
 
     [Fact]
@@ -28,7 +28,7 @@ public sealed class ListTypesToolTests(SharedSandboxFixture fixture, ITestOutput
         var project = Context.GetProject("ProjectApp");
         var result = await Sut.ExecuteAsync(CancellationToken.None, projectPath: project.Path);
 
-        result.ShouldMatchTypes(2, "AppEntryPoints", "AppOrchestrator");
+        result.ShouldMatchTypes(3, "AppEntryPoints", "AppOrchestrator", "MethodMutationTestTarget");
         result.Context.SourceBias.Is(SourceBiases.Handwritten);
         result.Context.Limitations.Any(static limitation => limitation.Contains("generated declarations were omitted", StringComparison.OrdinalIgnoreCase)).IsTrue();
     }
@@ -39,7 +39,7 @@ public sealed class ListTypesToolTests(SharedSandboxFixture fixture, ITestOutput
         var projectId = await GetProjectIdAsync("ProjectApp");
         var result = await Sut.ExecuteAsync(CancellationToken.None, projectId: projectId);
 
-        result.ShouldMatchTypes(2, "AppEntryPoints", "AppOrchestrator");
+        result.ShouldMatchTypes(3, "AppEntryPoints", "AppOrchestrator", "MethodMutationTestTarget");
     }
 
     [Fact]
