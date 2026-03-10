@@ -74,10 +74,22 @@ Traditional AI code assistants often rely on simplistic pattern matching (grep/g
 | **Get Type Hierarchy**   | Explore type inheritance and derived types                         |
 | **Find Code Smells**     | Detect potential issues in a file                                  |
 
-| Mutation Tool       | Description                                           |
-| ------------------- | ----------------------------------------------------- |
-| **Rename Symbol**   | Rename operation for types, methods, etc.             |
-| **Format Document** | Format a C# source file using the solution's settings |
+| Mutation Tool              | Description                                                                    |
+| -------------------------- | ------------------------------------------------------------------------------ |
+| **Add Method**             | Add a helper or overload to an existing type using symbol-aware insertion      |
+| **Replace Method**         | Replace a full method declaration when name, signature, or modifiers must move |
+| **Replace Method Body**    | Change only method logic while preserving the existing declaration shape        |
+| **Delete Method**          | Remove an obsolete method or disposable helper by exact symbol target          |
+| **Rename Symbol**          | Rename operation for types, methods, etc.                                      |
+| **Format Document**        | Format a C# source file using the solution's settings                          |
+
+### When To Use Mutation Tools vs Text Edits
+
+Use mutation tools when an agent needs a precise, symbol-aware edit and wants Roslyn to target the exact declaration instead of relying on file positions or text matching. They are especially useful for overloaded methods, signature changes, targeted logic replacement, and cleanup work where touching the wrong method would be expensive.
+
+Prefer normal text edits when the task spans multiple nearby code regions, when the desired syntax is not well expressed by the mutation API, or when the agent is still shaping code quickly and does not yet need symbol-level precision.
+
+In practice, the best workflow is often hybrid: resolve the symbol with Roslyn, use mutation tools for the risky surgical edit, and fall back to normal file editing for broader reshaping around it.
 
 
 
@@ -262,6 +274,51 @@ Use this tool when you need to rename a symbol (type, method, property, field, p
 Parameters:
 - `symbolId` (required): The symbol ID of the symbol to rename. Use 'resolve_symbol' to obtain this if needed.
 - `newName` (required): The new name for the symbol. Must be a valid C# identifier and should not conflict with existing symbols in the same scope.
+
+
+### `add_method`
+
+Use this tool when you need to add a new method to an existing loaded type without manually rewriting the full file. It is a good fit for adding helpers or overloads when an agent wants exact symbol-aware insertion instead of line-based text editing. Provide a target type symbol id, flat method signature fields, a list of simple parameter declaration strings like `string input`, and a body string containing only the statements inside the method body block. The body can be multi-line and may include local functions, lambdas, loops, `async`/`await`, and `try`/`catch` as long as it is valid for the requested method shape. The tool inserts the method structurally, formats the changed document, applies the solution, and returns the created method symbol id plus newly introduced diagnostics for the changed document.
+
+Parameters:
+- `targetTypeSymbolId` (required): The stable symbol id of the existing target type that should receive the new method.
+- `name` (required): The new method name, for example `Evaluate`.
+- `returnType` (required): The C# return type text, for example `string`, `int`, or `Task<string>`.
+- `accessibility` (required): The declared accessibility: `public`, `internal`, `private`, `protected`, `protected_internal`, or `private_protected`.
+- `modifiers` (optional): Optional method modifiers as individual tokens, for example `['static']` or `['async']`. Do not include accessibility here.
+- `parameters` (optional): Optional parameter declarations without surrounding parentheses. Each entry should be a simple C# parameter declaration string such as `string input`, `int priority`, or `bool isEnabled`.
+- `body` (required): The method body content only, without outer braces. This may contain multiple statements and nested control flow as long as the body parses as valid C# for the requested method.
+
+
+### `replace_method`
+
+Use this tool when you need to replace an existing method in a loaded type without manually rewriting the full file. This is the right choice when an agent must change the method name, signature, modifiers, or return type and wants a structural edit instead of a brittle text replacement. Provide the target method symbol id plus flat method declaration fields. Parameters must be simple C# parameter declaration strings like `string input` without surrounding parentheses, and the body must contain only the statements inside the method body without braces. The body can be multi-line and may include local functions, lambdas, loops, `async`/`await`, and `try`/`catch` as long as it is valid for the replacement method shape. The tool replaces the method structurally, formats the changed document, applies the solution, and returns the new method symbol id plus newly introduced diagnostics for the changed document. After replacement, continue with the returned new symbol id for later operations on that method.
+
+Parameters:
+- `targetMethodSymbolId` (required): The stable symbol id of the exact existing method to replace. This must resolve to one source-declared, ordinary C# method.
+- `name` (required): The replacement method name, for example `Evaluate`.
+- `returnType` (required): The replacement C# return type text, for example `string`, `int`, or `Task<string>`.
+- `accessibility` (required): The replacement accessibility: `public`, `internal`, `private`, `protected`, `protected_internal`, or `private_protected`.
+- `modifiers` (optional): Optional replacement method modifiers as individual tokens, for example `['static']` or `['async']`. Do not include accessibility here.
+- `parameters` (optional): Optional replacement parameter declarations without surrounding parentheses. Each entry should be a simple C# parameter declaration string such as `string input`, `int priority`, or `bool isEnabled`.
+- `body` (required): The replacement method body content only, without outer braces. This may contain multiple statements and nested control flow as long as the body parses as valid C# for the replacement method.
+
+
+### `replace_method_body`
+
+Use this tool when you need to replace only the body of an existing block-bodied method in a loaded C# solution. It is the best fit for targeted logic changes when the method declaration should stay exactly as it is. Provide the target method symbol id and a body string containing only the statements inside the method body, without outer braces. The body can be multi-line and may include local functions, lambdas, loops, `async`/`await`, and `try`/`catch` as long as it is valid for that method. The tool preserves the existing method declaration shape, replaces only the body node, formats the changed document, applies the solution, and returns changed files plus newly introduced diagnostics for the changed document. This tool currently supports only block-bodied methods, not expression-bodied methods.
+
+Parameters:
+- `targetMethodSymbolId` (required): The stable symbol id of the exact existing method whose body should be replaced. This must resolve to one source-declared, ordinary, block-bodied C# method.
+- `body` (required): The replacement method body content only, without outer braces. This may contain multiple statements and nested control flow as long as the body parses as valid C# for the existing method.
+
+
+### `delete_method`
+
+Use this tool when you need to delete an existing method from a loaded solution without manually rewriting the full file. It is especially useful for exact cleanup work such as removing obsolete overloads or disposable helper methods without risking the wrong declaration in a crowded file. Provide the stable symbol id of the exact method to remove. The tool resolves the method semantically, removes its source declaration structurally, formats the changed document, applies the solution, and returns changed files plus newly introduced diagnostics for the changed document.
+
+Parameters:
+- `targetMethodSymbolId` (required): The stable symbol id of the exact existing method to delete. This must resolve to one source-declared, ordinary C# method.
 
 
 ### `format_document`
