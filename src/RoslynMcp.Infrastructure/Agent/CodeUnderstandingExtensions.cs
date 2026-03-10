@@ -10,30 +10,30 @@ public static partial class CodeUnderstandingExtensions
     public static IEnumerable<INamedTypeSymbol> EnumerateTypes(this INamespaceSymbol root)
     {
         var stack = new Stack<INamespaceOrTypeSymbol>();
+
         foreach (var member in root.GetMembers().OrderBy(static m => m.Name, StringComparer.Ordinal))
-        {
             stack.Push(member);
-        }
 
         while (stack.Count > 0)
         {
             var current = stack.Pop();
-            if (current is INamedTypeSymbol namedType)
+
+            switch (current)
             {
-                yield return namedType;
-                foreach (var nested in namedType.GetTypeMembers().OrderByDescending(static m => m.Name, StringComparer.Ordinal))
+                case INamedTypeSymbol namedType:
                 {
-                    stack.Push(nested);
+                    yield return namedType;
+
+                    foreach (var nested in namedType.GetTypeMembers().OrderByDescending(static m => m.Name, StringComparer.Ordinal))
+                        stack.Push(nested);
+
+                    continue;
                 }
-
-                continue;
-            }
-
-            if (current is INamespaceSymbol ns)
-            {
-                foreach (var member in ns.GetMembers().OrderByDescending(static m => m.Name, StringComparer.Ordinal))
+                case INamespaceSymbol ns:
                 {
-                    stack.Push(member);
+                    foreach (var member in ns.GetMembers().OrderByDescending(static m => m.Name, StringComparer.Ordinal))
+                        stack.Push(member);
+                    break;
                 }
             }
         }
@@ -49,16 +49,16 @@ public static partial class CodeUnderstandingExtensions
             yield return current;
 
             var baseType = current.BaseType;
+
             while (baseType != null)
             {
                 yield return baseType;
+
                 baseType = baseType.BaseType;
             }
 
             foreach (var iface in current.AllInterfaces.OrderBy(static i => i.ToDisplayString(), StringComparer.Ordinal))
-            {
                 yield return iface;
-            }
         }
 
         foreach (var declaringType in Traverse(type))
@@ -66,97 +66,103 @@ public static partial class CodeUnderstandingExtensions
             foreach (var member in declaringType.GetMembers())
             {
                 var kind = member.ToMemberKind();
+
                 if (kind == null)
-                {
                     continue;
-                }
 
                 var key = SymbolIdentity.CreateId(member);
+
                 if (seen.Add(key))
-                {
                     builder.Add(member);
-                }
             }
         }
 
         return builder.ToImmutable();
     }
 
-    public static MemberListEntry? ToMemberEntry(
-        this ISymbol member,
-        string? normalizedKind,
-        string? normalizedAccessibility,
-        string? normalizedBinding)
+    extension(ISymbol member)
     {
-        var memberKind = member.ToMemberKind();
-        if (memberKind == null)
+        public string? ToMemberKind()
         {
-            return null;
-        }
-
-        if (normalizedKind != null && !string.Equals(memberKind, normalizedKind, StringComparison.Ordinal))
-        {
-            return null;
-        }
-
-        var accessibility = member.DeclaredAccessibility.NormalizeAccessibility();
-        if (normalizedAccessibility != null && !string.Equals(accessibility, normalizedAccessibility, StringComparison.Ordinal))
-        {
-            return null;
-        }
-
-        if (normalizedBinding != null)
-        {
-            var isStatic = member.IsStatic;
-            if ((string.Equals(normalizedBinding, "static", StringComparison.Ordinal) && !isStatic)
-                || (string.Equals(normalizedBinding, "instance", StringComparison.Ordinal) && isStatic))
+            return member switch
             {
+                IMethodSymbol { MethodKind: MethodKind.Constructor or MethodKind.StaticConstructor } => "ctor",
+                IMethodSymbol method when method.MethodKind == MethodKind.Ordinary || method.MethodKind == MethodKind.UserDefinedOperator
+                    || method.MethodKind == MethodKind.Conversion || method.MethodKind == MethodKind.ReducedExtension
+                    || method.MethodKind == MethodKind.DelegateInvoke => "method",
+                IPropertySymbol => "property",
+                IFieldSymbol field when !field.IsImplicitlyDeclared => "field",
+                IEventSymbol => "event",
+                _ => null
+            };
+        }
+
+        public MemberListEntry? ToMemberEntry(string? normalizedKind,
+            string? normalizedAccessibility,
+            string? normalizedBinding)
+        {
+            var memberKind = member.ToMemberKind();
+            if (memberKind == null)
                 return null;
+
+            if (normalizedKind != null && !string.Equals(memberKind, normalizedKind, StringComparison.Ordinal))
+                return null;
+
+            var accessibility = member.DeclaredAccessibility.NormalizeAccessibility();
+            if (normalizedAccessibility != null && !string.Equals(accessibility, normalizedAccessibility, StringComparison.Ordinal))
+                return null;
+
+            if (normalizedBinding != null)
+            {
+                var isStatic = member.IsStatic;
+                if ((string.Equals(normalizedBinding, "static", StringComparison.Ordinal) && !isStatic)
+                    || (string.Equals(normalizedBinding, "instance", StringComparison.Ordinal) && isStatic))
+                {
+                    return null;
+                }
             }
+
+            var (filePath, line, column) = member.GetDeclarationPosition();
+            var reference = member.ToSymbolReference();
+            return new MemberListEntry(
+                member.Kind == SymbolKind.Method && member is IMethodSymbol { MethodKind: MethodKind.Constructor } constructor
+                    ? constructor.ContainingType.Name
+                    : member.Name,
+                reference.SymbolId,
+                memberKind,
+                member.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.MinimallyQualifiedFormat),
+                filePath,
+                line,
+                column,
+                accessibility,
+                member.IsStatic,
+                reference);
         }
 
-        var (filePath, line, column) = member.GetDeclarationPosition();
-        var reference = member.ToSymbolReference();
-        return new MemberListEntry(
-            member.Kind == SymbolKind.Method && member is IMethodSymbol { MethodKind: MethodKind.Constructor } constructor
-                ? constructor.ContainingType.Name
-                : member.Name,
-            reference.SymbolId,
-            memberKind,
-            member.ToDisplayString(Microsoft.CodeAnalysis.SymbolDisplayFormat.MinimallyQualifiedFormat),
-            filePath,
-            line,
-            column,
-            accessibility,
-            member.IsStatic,
-            reference);
-    }
-
-    public static string? ToLightweightMemberEntry(this ISymbol member)
-    {
-        if (member.ToMemberKind() == null)
+        public string? ToLightweightMemberEntry()
         {
-            return null;
+            if (member.ToMemberKind() == null)
+                return null;
+
+            return $"{member.DeclaredAccessibility.NormalizeAccessibility()} {member.ToLightweightMemberSignature()}";
         }
 
-        return $"{member.DeclaredAccessibility.NormalizeAccessibility()} {member.ToLightweightMemberSignature()}";
+        public string ToLightweightMemberSignature()
+            => member switch
+            {
+                IMethodSymbol { MethodKind: MethodKind.Constructor or MethodKind.StaticConstructor } constructor
+                    => $"{constructor.ContainingType.ToReadableTypeName()}({FormatParameters(constructor.Parameters)})",
+                IMethodSymbol method
+                    => FormatMethodSignature(method),
+                IPropertySymbol property
+                    => $"{property.Type.ToReadableTypeReference(includeNamespaces: false)} {FormatPropertyName(property)} {{ {FormatPropertyAccessors(property)} }}",
+                IFieldSymbol field
+                    => $"{field.Type.ToReadableTypeReference(includeNamespaces: false)} {field.Name}",
+                IEventSymbol @event
+                    => $"event {@event.Type.ToReadableTypeReference(includeNamespaces: false)} {@event.Name}",
+                _ => member.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)
+            };
     }
-
-    public static string ToLightweightMemberSignature(this ISymbol member)
-        => member switch
-        {
-            IMethodSymbol { MethodKind: MethodKind.Constructor or MethodKind.StaticConstructor } constructor
-                => $"{constructor.ContainingType.ToReadableTypeName()}({FormatParameters(constructor.Parameters)})",
-            IMethodSymbol method
-                => FormatMethodSignature(method),
-            IPropertySymbol property
-                => $"{property.Type.ToReadableTypeReference(includeNamespaces: false)} {FormatPropertyName(property)} {{ {FormatPropertyAccessors(property)} }}",
-            IFieldSymbol field
-                => $"{field.Type.ToReadableTypeReference(includeNamespaces: false)} {field.Name}",
-            IEventSymbol @event
-                => $"event {@event.Type.ToReadableTypeReference(includeNamespaces: false)} {@event.Name}",
-            _ => member.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)
-        };
 
     private static string FormatMethodSignature(IMethodSymbol method)
     {
@@ -198,63 +204,45 @@ public static partial class CodeUnderstandingExtensions
     {
         var accessors = new List<string>(2);
         if (property.GetMethod != null)
-        {
             accessors.Add("get;");
-        }
 
         if (property.SetMethod != null)
-        {
             accessors.Add(property.SetMethod.IsInitOnly ? "init;" : "set;");
-        }
 
         return string.Join(" ", accessors);
     }
 
-    public static string? ToTypeKind(this INamedTypeSymbol type)
+    extension(INamedTypeSymbol symbol)
     {
-        if (type.IsRecord)
+        public bool IsPartial()
         {
-            return "record";
-        }
-
-        return type.TypeKind switch
-        {
-            TypeKind.Class => "class",
-            TypeKind.Interface => "interface",
-            TypeKind.Enum => "enum",
-            TypeKind.Struct => "struct",
-            _ => null
-        };
-    }
-
-    public static string? ToMemberKind(this ISymbol symbol)
-    {
-        return symbol switch
-        {
-            IMethodSymbol { MethodKind: MethodKind.Constructor or MethodKind.StaticConstructor } => "ctor",
-            IMethodSymbol method when method.MethodKind == MethodKind.Ordinary || method.MethodKind == MethodKind.UserDefinedOperator
-                || method.MethodKind == MethodKind.Conversion || method.MethodKind == MethodKind.ReducedExtension
-                || method.MethodKind == MethodKind.DelegateInvoke => "method",
-            IPropertySymbol => "property",
-            IFieldSymbol field when !field.IsImplicitlyDeclared => "field",
-            IEventSymbol => "event",
-            _ => null
-        };
-    }
-
-    public static bool IsPartial(this INamedTypeSymbol symbol)
-    {
-        foreach (var syntaxReference in symbol.DeclaringSyntaxReferences)
-        {
-            var syntax = syntaxReference.GetSyntax();
-            if (syntax is Microsoft.CodeAnalysis.CSharp.Syntax.TypeDeclarationSyntax typeDeclaration
-                && typeDeclaration.Modifiers.Any(modifier => modifier.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.PartialKeyword)))
+            foreach (var syntaxReference in symbol.DeclaringSyntaxReferences)
             {
-                return true;
+                var syntax = syntaxReference.GetSyntax();
+                if (syntax is Microsoft.CodeAnalysis.CSharp.Syntax.TypeDeclarationSyntax typeDeclaration
+                    && typeDeclaration.Modifiers.Any(modifier => modifier.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.PartialKeyword)))
+                {
+                    return true;
+                }
             }
+
+            return false;
         }
 
-        return false;
+        public string? ToTypeKind()
+        {
+            if (symbol.IsRecord)
+                return "record";
+
+            return symbol.TypeKind switch
+            {
+                TypeKind.Class => "class",
+                TypeKind.Interface => "interface",
+                TypeKind.Enum => "enum",
+                TypeKind.Struct => "struct",
+                _ => null
+            };
+        }
     }
 
     public static (string FilePath, int? Line, int? Column) GetDeclarationPosition(this ISymbol symbol)

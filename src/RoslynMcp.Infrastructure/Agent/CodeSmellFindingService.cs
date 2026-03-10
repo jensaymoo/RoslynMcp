@@ -28,7 +28,7 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
         ResultCompletenessStates.Degraded,
         Array.Empty<string>(),
         Array.Empty<string>());
-   
+
     private static readonly CodeSmellsSummary EmptySummary = new(0, 0, 0, 0);
 
     private readonly IRoslynSolutionAccessor _solutionAccessor = solutionAccessor ?? throw new ArgumentNullException(nameof(solutionAccessor));
@@ -117,8 +117,8 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
             if (actionsAtAnchor.Length == 0 && anchor.IsDiagnostic && anchor.AnchorKind.StartsWith("Diagnostic:"))
             {
                 var diagnosticId = anchor.AnchorKind.Substring("Diagnostic:".Length);
-                actionsAtAnchor = new[]
-                {
+                actionsAtAnchor =
+                [
                     new RefactoringActionDescriptor(
                         $"diagnostic_{diagnosticId}",
                         $"Diagnostic: {diagnosticId}",
@@ -128,7 +128,7 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
                         new PolicyDecisionInfo("allow", "diagnostic", "Found by analyzer"),
                         new SourceLocation(anchor.FilePath, anchor.Line, anchor.Column),
                         diagnosticId)
-                };
+                ];
             }
 
             if (actionsAtAnchor.Length == 0)
@@ -156,17 +156,15 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
         var deduped = DeduplicateMatches(actions, warnings);
         var prioritized = PrioritizeMatches(deduped, filters.ReviewMode);
         var limitedMatches = filters.ApplyLimit(prioritized);
+
         if (limitedMatches.Count == 0 && (filters.RiskLevels is not null || filters.Categories is not null))
-        {
             warnings.Add("No findings matched the requested riskLevels/categories filters.");
-        }
 
         if (string.Equals(filters.ReviewMode, CodeSmellReviewModes.Conservative, StringComparison.Ordinal))
-        {
             warnings.Add("reviewMode=conservative suppresses lightweight style and trivia findings when stronger review concerns are available.");
-        }
 
         var aggregatedResult = AggregateMatches(limitedMatches);
+
         return new FindCodeSmellsResult(aggregatedResult.Summary, aggregatedResult.RiskBuckets, warnings, CreateContext(document.FilePath, warnings));
     }
 
@@ -210,9 +208,7 @@ public sealed class CodeSmellFindingService(IRoslynSolutionAccessor solutionAcce
         }
 
         if (deduplicated.Count <= MaximumScannedAnchors)
-        {
             return deduplicated;
-        }
 
         warnings.Add($"Anchor discovery truncated to {MaximumScannedAnchors} positions from {deduplicated.Count}.");
         return deduplicated.Take(MaximumScannedAnchors).ToArray();
