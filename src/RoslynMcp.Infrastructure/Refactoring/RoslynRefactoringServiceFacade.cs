@@ -49,4 +49,16 @@ public sealed class RoslynRefactoringService : IRefactoringService
 
     public Task<FormatDocumentResult> FormatDocumentAsync(FormatDocumentRequest request, CancellationToken ct)
         => _orchestrator.FormatDocumentAsync(request, ct);
+
+    public Task<AddMethodResult> AddMethodAsync(AddMethodRequest request, CancellationToken ct)
+        => _orchestrator.AddMethodAsync(request, ct);
+
+    public Task<DeleteMethodResult> DeleteMethodAsync(DeleteMethodRequest request, CancellationToken ct)
+        => _orchestrator.DeleteMethodAsync(request, ct);
+
+    public Task<ReplaceMethodResult> ReplaceMethodAsync(ReplaceMethodRequest request, CancellationToken ct)
+        => _orchestrator.ReplaceMethodAsync(request, ct);
+
+    public Task<ReplaceMethodBodyResult> ReplaceMethodBodyAsync(ReplaceMethodBodyRequest request, CancellationToken ct)
+        => _orchestrator.ReplaceMethodBodyAsync(request, ct);
 }

@@ -66,6 +66,10 @@ internal sealed class RefactoringOperationOrchestrator : IRefactoringOperationOr
     private readonly CleanupOperations _cleanupOperations;
     private readonly RenameOperations _renameOperations;
     private readonly DocumentFormattingOperations _formatDocumentOperations;
+    private readonly AddMethodOperations _addMethodOperations;
+    private readonly DeleteMethodOperations _deleteMethodOperations;
+    private readonly ReplaceMethodOperations _replaceMethodOperations;
+    private readonly ReplaceMethodBodyOperations _replaceMethodBodyOperations;
 
     public RefactoringOperationOrchestrator(IRoslynSolutionAccessor solutionAccessor,
         ILogger<RoslynRefactoringService>? logger = null)
@@ -80,6 +84,10 @@ internal sealed class RefactoringOperationOrchestrator : IRefactoringOperationOr
         _cleanupOperations = new CleanupOperations(this);
         _renameOperations = new RenameOperations(this);
         _formatDocumentOperations = new DocumentFormattingOperations(this);
+        _addMethodOperations = new AddMethodOperations(this);
+        _deleteMethodOperations = new DeleteMethodOperations(this);
+        _replaceMethodOperations = new ReplaceMethodOperations(this);
+        _replaceMethodBodyOperations = new ReplaceMethodBodyOperations(this);
     }
 
     public Task<GetRefactoringsAtPositionResult> GetRefactoringsAtPositionAsync(
@@ -110,6 +118,18 @@ internal sealed class RefactoringOperationOrchestrator : IRefactoringOperationOr
 
     public Task<FormatDocumentResult> FormatDocumentAsync(FormatDocumentRequest request, CancellationToken ct)
         => _formatDocumentOperations.FormatDocumentAsync(request, ct);
+
+    public Task<AddMethodResult> AddMethodAsync(AddMethodRequest request, CancellationToken ct)
+        => _addMethodOperations.AddMethodAsync(request, ct);
+
+    public Task<DeleteMethodResult> DeleteMethodAsync(DeleteMethodRequest request, CancellationToken ct)
+        => _deleteMethodOperations.DeleteMethodAsync(request, ct);
+
+    public Task<ReplaceMethodResult> ReplaceMethodAsync(ReplaceMethodRequest request, CancellationToken ct)
+        => _replaceMethodOperations.ReplaceMethodAsync(request, ct);
+
+    public Task<ReplaceMethodBodyResult> ReplaceMethodBodyAsync(ReplaceMethodBodyRequest request, CancellationToken ct)
+        => _replaceMethodBodyOperations.ReplaceMethodBodyAsync(request, ct);
 
     internal async Task<Solution> ApplyDiagnosticCleanupStepAsync(
         Solution solution,

@@ -609,6 +609,90 @@ internal static class RefactoringOperationExtensions
         return new FormatDocumentResult(path, false, safeError);
     }
 
+    public static AddMethodResult CreateAddMethodErrorResult(string targetTypeSymbolId, string code, string message, params (string Key, string? Value)[] details)
+        => new(
+            "failed",
+            Array.Empty<string>(),
+            targetTypeSymbolId,
+            null,
+            new DiagnosticsDeltaInfo(Array.Empty<MutationDiagnosticInfo>(), Array.Empty<MutationDiagnosticInfo>()),
+            CreateError(code, message, details));
+
+    public static AddMethodResult CreateAddMethodErrorResult(string targetTypeSymbolId, ErrorInfo? error)
+    {
+        var safeError = error ?? new ErrorInfo(Core.ErrorCodes.InternalError, "An unknown error occurred while adding the method.");
+        return new AddMethodResult(
+            "failed",
+            Array.Empty<string>(),
+            targetTypeSymbolId,
+            null,
+            new DiagnosticsDeltaInfo(Array.Empty<MutationDiagnosticInfo>(), Array.Empty<MutationDiagnosticInfo>()),
+            safeError);
+    }
+
+    public static DeleteMethodResult CreateDeleteMethodErrorResult(string targetMethodSymbolId, string code, string message, params (string Key, string? Value)[] details)
+        => new(
+            "failed",
+            Array.Empty<string>(),
+            targetMethodSymbolId,
+            null,
+            new DiagnosticsDeltaInfo(Array.Empty<MutationDiagnosticInfo>(), Array.Empty<MutationDiagnosticInfo>()),
+            CreateError(code, message, details));
+
+    public static DeleteMethodResult CreateDeleteMethodErrorResult(string targetMethodSymbolId, ErrorInfo? error)
+    {
+        var safeError = error ?? new ErrorInfo(Core.ErrorCodes.InternalError, "An unknown error occurred while deleting the method.");
+        return new DeleteMethodResult(
+            "failed",
+            Array.Empty<string>(),
+            targetMethodSymbolId,
+            null,
+            new DiagnosticsDeltaInfo(Array.Empty<MutationDiagnosticInfo>(), Array.Empty<MutationDiagnosticInfo>()),
+            safeError);
+    }
+
+    public static ReplaceMethodResult CreateReplaceMethodErrorResult(string targetMethodSymbolId, string code, string message, params (string Key, string? Value)[] details)
+        => new(
+            "failed",
+            Array.Empty<string>(),
+            targetMethodSymbolId,
+            null,
+            new DiagnosticsDeltaInfo(Array.Empty<MutationDiagnosticInfo>(), Array.Empty<MutationDiagnosticInfo>()),
+            CreateError(code, message, details));
+
+    public static ReplaceMethodResult CreateReplaceMethodErrorResult(string targetMethodSymbolId, ErrorInfo? error)
+    {
+        var safeError = error ?? new ErrorInfo(Core.ErrorCodes.InternalError, "An unknown error occurred while replacing the method.");
+        return new ReplaceMethodResult(
+            "failed",
+            Array.Empty<string>(),
+            targetMethodSymbolId,
+            null,
+            new DiagnosticsDeltaInfo(Array.Empty<MutationDiagnosticInfo>(), Array.Empty<MutationDiagnosticInfo>()),
+            safeError);
+    }
+
+    public static ReplaceMethodBodyResult CreateReplaceMethodBodyErrorResult(string targetMethodSymbolId, string code, string message, params (string Key, string? Value)[] details)
+        => new(
+            "failed",
+            Array.Empty<string>(),
+            targetMethodSymbolId,
+            null,
+            new DiagnosticsDeltaInfo(Array.Empty<MutationDiagnosticInfo>(), Array.Empty<MutationDiagnosticInfo>()),
+            CreateError(code, message, details));
+
+    public static ReplaceMethodBodyResult CreateReplaceMethodBodyErrorResult(string targetMethodSymbolId, ErrorInfo? error)
+    {
+        var safeError = error ?? new ErrorInfo(Core.ErrorCodes.InternalError, "An unknown error occurred while replacing the method body.");
+        return new ReplaceMethodBodyResult(
+            "failed",
+            Array.Empty<string>(),
+            targetMethodSymbolId,
+            null,
+            new DiagnosticsDeltaInfo(Array.Empty<MutationDiagnosticInfo>(), Array.Empty<MutationDiagnosticInfo>()),
+            safeError);
+    }
+
     public static ErrorInfo? TryCreateInvalidSymbolIdError(string symbolId, string operation)
     {
         if (!string.IsNullOrWhiteSpace(symbolId))
@@ -620,6 +704,34 @@ internal static class RefactoringOperationExtensions
             Core.ErrorCodes.InvalidInput,
             "symbolId must be a non-empty, non-whitespace string.",
             ("parameter", "symbolId"),
+            ("operation", operation));
+    }
+
+    public static ErrorInfo? TryCreateInvalidTargetTypeSymbolIdError(string symbolId, string operation)
+    {
+        if (!string.IsNullOrWhiteSpace(symbolId))
+        {
+            return null;
+        }
+
+        return CreateError(
+            Core.ErrorCodes.InvalidInput,
+            "targetTypeSymbolId must be a non-empty, non-whitespace string.",
+            ("parameter", "targetTypeSymbolId"),
+            ("operation", operation));
+    }
+
+    public static ErrorInfo? TryCreateInvalidMethodSymbolIdError(string symbolId, string operation)
+    {
+        if (!string.IsNullOrWhiteSpace(symbolId))
+        {
+            return null;
+        }
+
+        return CreateError(
+            Core.ErrorCodes.InvalidInput,
+            "targetMethodSymbolId must be a non-empty, non-whitespace string.",
+            ("parameter", "targetMethodSymbolId"),
             ("operation", operation));
     }
 

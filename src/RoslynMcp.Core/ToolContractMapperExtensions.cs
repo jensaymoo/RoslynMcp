@@ -136,6 +136,46 @@ public static class ToolContractMapperExtensions
 
         public FormatDocumentRequest ToFormatDocumentRequest()
             => new(NormalizeOptionalString(solutionHintPath) ?? string.Empty);
+
+        public AddMethodRequest ToAddMethodRequest(
+            string? name,
+            string? returnType,
+            string? accessibility,
+            IReadOnlyList<string>? modifiers,
+            IReadOnlyList<string>? parameters,
+            string? body)
+            => new(
+                NormalizeSymbolId(solutionHintPath),
+                new MethodInsertionSpec(
+                    NormalizeString(name),
+                    NormalizeString(returnType),
+                    NormalizeString(accessibility),
+                    NormalizeOptionalStrings(modifiers) ?? Array.Empty<string>(),
+                    ParseMethodParameters(parameters),
+                    NormalizeString(body)));
+
+        public DeleteMethodRequest ToDeleteMethodRequest()
+            => new(NormalizeSymbolId(solutionHintPath));
+
+        public ReplaceMethodRequest ToReplaceMethodRequest(
+            string? name,
+            string? returnType,
+            string? accessibility,
+            IReadOnlyList<string>? modifiers,
+            IReadOnlyList<string>? parameters,
+            string? body)
+            => new(
+                NormalizeSymbolId(solutionHintPath),
+                new MethodInsertionSpec(
+                    NormalizeString(name),
+                    NormalizeString(returnType),
+                    NormalizeString(accessibility),
+                    NormalizeOptionalStrings(modifiers) ?? Array.Empty<string>(),
+                    ParseMethodParameters(parameters),
+                    NormalizeString(body)));
+
+        public ReplaceMethodBodyRequest ToReplaceMethodBodyRequest(string? body)
+            => new(NormalizeSymbolId(solutionHintPath), NormalizeString(body));
     }
 
     private static int NormalizePosition(int value)
@@ -171,4 +211,30 @@ public static class ToolContractMapperExtensions
 
     private static string NormalizeString(string? input)
         => string.IsNullOrWhiteSpace(input) ? string.Empty : input.Trim();
+
+    private static IReadOnlyList<MethodParameterSpec> ParseMethodParameters(IReadOnlyList<string>? parameters)
+    {
+        var normalized = NormalizeOptionalStrings(parameters);
+        if (normalized is null || normalized.Count == 0)
+        {
+            return Array.Empty<MethodParameterSpec>();
+        }
+
+        var results = new List<MethodParameterSpec>(normalized.Count);
+        foreach (var parameter in normalized)
+        {
+            var separatorIndex = parameter.LastIndexOf(' ');
+            if (separatorIndex <= 0 || separatorIndex == parameter.Length - 1)
+            {
+                results.Add(new MethodParameterSpec(string.Empty, parameter));
+                continue;
+            }
+
+            var type = parameter[..separatorIndex].Trim();
+            var name = parameter[(separatorIndex + 1)..].Trim();
+            results.Add(new MethodParameterSpec(name, type));
+        }
+
+        return results;
+    }
 }

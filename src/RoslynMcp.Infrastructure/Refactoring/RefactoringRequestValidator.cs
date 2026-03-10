@@ -5,6 +5,78 @@ namespace RoslynMcp.Infrastructure.Refactoring;
 
 internal static class RefactoringRequestExtensions
 {
+    public static ReplaceMethodBodyResult? ValidateReplaceMethodBody(this ReplaceMethodBodyRequest request)
+    {
+        var invalidTargetError = RefactoringOperationExtensions.TryCreateInvalidMethodSymbolIdError(
+            request.TargetMethodSymbolId,
+            "replace_method_body");
+        if (invalidTargetError != null)
+        {
+            return RefactoringOperationExtensions.CreateReplaceMethodBodyErrorResult(request.TargetMethodSymbolId, invalidTargetError);
+        }
+
+        return null;
+    }
+
+    public static ReplaceMethodResult? ValidateReplaceMethod(this ReplaceMethodRequest request)
+    {
+        var invalidTargetError = RefactoringOperationExtensions.TryCreateInvalidMethodSymbolIdError(
+            request.TargetMethodSymbolId,
+            "replace_method");
+        if (invalidTargetError != null)
+        {
+            return RefactoringOperationExtensions.CreateReplaceMethodErrorResult(request.TargetMethodSymbolId, invalidTargetError);
+        }
+
+        if (request.Method is null)
+        {
+            return RefactoringOperationExtensions.CreateReplaceMethodErrorResult(
+                request.TargetMethodSymbolId,
+                ErrorCodes.InvalidInput,
+                "method must be provided.",
+                ("parameter", "method"),
+                ("operation", "replace_method"));
+        }
+
+        return null;
+    }
+
+    public static DeleteMethodResult? ValidateDeleteMethod(this DeleteMethodRequest request)
+    {
+        var invalidTargetError = RefactoringOperationExtensions.TryCreateInvalidMethodSymbolIdError(
+            request.TargetMethodSymbolId,
+            "delete_method");
+        if (invalidTargetError != null)
+        {
+            return RefactoringOperationExtensions.CreateDeleteMethodErrorResult(request.TargetMethodSymbolId, invalidTargetError);
+        }
+
+        return null;
+    }
+
+    public static AddMethodResult? ValidateAddMethod(this AddMethodRequest request)
+    {
+        var invalidTargetError = RefactoringOperationExtensions.TryCreateInvalidTargetTypeSymbolIdError(
+            request.TargetTypeSymbolId,
+            "add_method");
+        if (invalidTargetError != null)
+        {
+            return RefactoringOperationExtensions.CreateAddMethodErrorResult(request.TargetTypeSymbolId, invalidTargetError);
+        }
+
+        if (request.Method is null)
+        {
+            return RefactoringOperationExtensions.CreateAddMethodErrorResult(
+                request.TargetTypeSymbolId,
+                ErrorCodes.InvalidInput,
+                "method must be provided.",
+                ("parameter", "method"),
+                ("operation", "add_method"));
+        }
+
+        return null;
+    }
+
     public static FormatDocumentResult? ValidateFormatDocument(this FormatDocumentRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Path))
