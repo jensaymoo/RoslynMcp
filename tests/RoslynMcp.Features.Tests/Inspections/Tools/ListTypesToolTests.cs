@@ -72,6 +72,16 @@ public sealed class ListTypesToolTests(SharedSandboxFixture fixture, ITestOutput
     }
 
     [Fact]
+    public async Task ListTypesAsync_WithoutIncludeMembers_KeepsMembersOmitted()
+    {
+        var project = Context.GetProject("ProjectCore");
+        var result = await Sut.ExecuteAsync(CancellationToken.None, projectName: project.Name, kind: "class");
+
+        result.Error.ShouldBeNone();
+        result.Types.Single(static type => type.DisplayName == "Documentation").Members.IsNull();
+    }
+
+    [Fact]
     public async Task ListTypesAsync_WithIncludeSummary_ReturnsTypeSummaryOnlyWhenAvailable()
     {
         var project = Context.GetProject("ProjectCore");
@@ -81,6 +91,26 @@ public sealed class ListTypesToolTests(SharedSandboxFixture fixture, ITestOutput
         result.Types.Single(static type => type.DisplayName == "Documentation").Summary
             .Is("Documentation service for testing XML comment parsing. Provides summary, returns, and parameter documentation.");
         result.Types.Single(static type => type.DisplayName == "BaseClass").Summary.IsNull();
+    }
+
+    [Fact]
+    public async Task ListTypesAsync_WithIncludeMembers_ReturnsLightweightDeclaredMembers()
+    {
+        var project = Context.GetProject("ProjectCore");
+        var result = await Sut.ExecuteAsync(CancellationToken.None, projectName: project.Name, kind: "class", includeMembers: true);
+
+        result.Error.ShouldBeNone();
+        result.Types.Single(static type => type.DisplayName == "Documentation").Members.Is(
+            "public Documentation()",
+            "public int Add(int a, int b)",
+            "public Documentation CreateDocumentation()",
+            "public string FormatMessage(string name)",
+            "public string MixedReferences(string x)",
+            "public void NoDocumentation()",
+            "public string NoDocumentationMethod()",
+            "public string Process(string input)",
+            "public void SetValue(int value)",
+            "public string WithParamRef(string input)");
     }
 
     [Fact]

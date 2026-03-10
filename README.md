@@ -127,7 +127,7 @@ Parameters:
 
 ### `list_types`
 
-Use this tool when you need to list types declared in a specific loaded project. It is useful for project-scoped discovery and for finding type symbols by name before calling tools like `list_members`, `resolve_symbol`, or `get_type_hierarchy`. For automation, prefer projectPath as the stable selector; projectId is snapshot-local to the active workspace snapshot. Results prefer handwritten declarations by default, can optionally include XML documentation summaries for returned entries, and report source bias, completeness, and degraded discovery hints.
+Use this tool when you need to list types declared in a specific loaded project. It is useful for project-scoped discovery and for finding type symbols by name before calling tools like `list_members`, `resolve_symbol`, or `get_type_hierarchy`. It can also enrich just the returned type entries with XML summaries or lightweight declared-member previews when you need a quick scan before a deeper follow-up. For automation, prefer projectPath as the stable selector; projectId is snapshot-local to the active workspace snapshot. Results prefer handwritten declarations by default and report source bias, completeness, and degraded discovery hints.
 
 Parameters:
 - `projectPath` (optional): Exact path to a project file (`.csproj`). This is the recommended stable selector for automation. Specify only one of `projectPath`, `projectName`, or `projectId`.
@@ -137,8 +137,22 @@ Parameters:
 - `kind` (optional): Filter by type kind: `class`, `record`, `interface`, `enum`, or `struct`.
 - `accessibility` (optional): Filter by accessibility: `public`, `internal`, `protected`, `private`, `protected_internal`, or `private_protected`.
 - `includeSummary` (optional): When `true`, includes XML documentation summaries for returned type entries when available. Defaults to `false`.
+- `includeMembers` (optional): When `true`, includes a lightweight preview of declared members for each returned type entry on the current page. This is not full member metadata: each member is returned as a single normalized accessibility-plus-signature string, and inherited members are not included. Use `list_members` when you need detailed member data or member-level filtering. Defaults to `false`.
 - `limit` (optional): Maximum number of results to return. Defaults to `100`, maximum `500`.
 - `offset` (optional): Number of results to skip for pagination. Defaults to `0`.
+
+Use `includeMembers=true` when you are still browsing candidate types and want a quick, low-detail preview inline with `list_types` results. Use `list_members` when you have chosen a specific type and need the full member listing, filtering, or inherited-member options.
+
+Example:
+
+```json
+{
+  "projectPath": "src/MyProject/MyProject.csproj",
+  "namespacePrefix": "MyProject.Services",
+  "includeMembers": true,
+  "limit": 20
+}
+```
 
 
 ### `list_members`

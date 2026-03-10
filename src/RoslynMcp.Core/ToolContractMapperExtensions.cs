@@ -28,6 +28,7 @@ public static class ToolContractMapperExtensions
             string? kind,
             string? accessibility,
             bool? includeSummary,
+            bool? includeMembers,
             int? limit,
             int? offset)
             => new(
@@ -38,6 +39,7 @@ public static class ToolContractMapperExtensions
                 NormalizeOptionalString(kind)?.ToLowerInvariant(),
                 NormalizeOptionalString(accessibility)?.ToLowerInvariant(),
                 includeSummary ?? false,
+                includeMembers ?? false,
                 NormalizeNonNegative(limit),
                 NormalizeNonNegative(offset));
 

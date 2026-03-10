@@ -24,7 +24,7 @@ internal sealed class ListTypesHandler(
             "Call load_solution first to select a solution before listing types.",
             request.ProjectPath,
             ct).ConfigureAwait(false);
-        
+
         if (solution == null)
             return new ListTypesResult([], 0, EmptyContext, AgentErrorInfo.Normalize(solutionError, "Call load_solution first to select a solution before listing types."));
 
@@ -154,9 +154,9 @@ internal sealed class ListTypesHandler(
 
         var (offset, limit) = request.Offset.NormalizePaging(request.Limit);
         var paged = ordered.Skip(offset).Take(limit).ToArray();
-        var returnedEntries = request.IncludeSummary
-            ? paged.Select(candidate => EnrichSummary(candidate, symbolDocumentationProvider)).ToArray()
-            : paged.Select(static candidate => candidate.Entry).ToArray();
+        var returnedEntries = paged
+            .Select(candidate => EnrichEntry(candidate, request.IncludeSummary, request.IncludeMembers, symbolDocumentationProvider))
+            .ToArray();
 
         var selectedVisibility = SourceVisibility.AssessPaths(selectedProjectDocumentPaths);
         var returnedSourceBias = ordered.Length > 0
@@ -187,10 +187,52 @@ internal sealed class ListTypesHandler(
         return new ListTypesResult(returnedEntries, ordered.Length, context);
     }
 
-    private static TypeListEntry EnrichSummary(TypeDiscoveryEntry candidate, ISymbolDocumentationProvider symbolDocumentationProvider)
+    private static TypeListEntry EnrichEntry(
+        TypeDiscoveryEntry candidate,
+        bool includeSummary,
+        bool includeMembers,
+        ISymbolDocumentationProvider symbolDocumentationProvider)
     {
-        var summary = symbolDocumentationProvider.GetDocumentation(candidate.Symbol)?.Summary;
-        return candidate.Entry with { Summary = summary };
+        var summary = includeSummary
+            ? symbolDocumentationProvider.GetDocumentation(candidate.Symbol)?.Summary
+            : candidate.Entry.Summary;
+        var members = includeMembers
+            ? GetDeclaredLightweightMembers(candidate.Symbol)
+            : candidate.Entry.Members;
+
+        return candidate.Entry with
+        {
+            Summary = summary,
+            Members = members
+        };
+    }
+
+    private static IReadOnlyList<string> GetDeclaredLightweightMembers(INamedTypeSymbol type)
+    {
+        return type.GetMembers()
+            .Select(member =>
+            {
+                var (filePath, _, _) = member.GetDeclarationPosition();
+                return new
+                {
+                    Member = member,
+                    Kind = member.ToMemberKind(),
+                    Entry = member.ToLightweightMemberEntry(),
+                    DisplayName = member.Kind == SymbolKind.Method && member is IMethodSymbol { MethodKind: MethodKind.Constructor } constructor
+                        ? constructor.ContainingType.Name
+                        : member.Name,
+                    FilePath = filePath,
+                    Signature = member.ToLightweightMemberSignature()
+                };
+            })
+            .Where(static item => item.Kind != null)
+            .Where(static item => SourceVisibility.ShouldIncludeInHumanResults(item.FilePath))
+            .OrderBy(static item => item.Kind, StringComparer.Ordinal)
+            .ThenBy(static item => item.DisplayName, StringComparer.Ordinal)
+            .ThenBy(static item => item.Signature, StringComparer.Ordinal)
+            .ThenBy(static item => SymbolIdentity.CreateId(item.Member), StringComparer.Ordinal)
+            .Select(static item => item.Entry!)
+            .ToArray();
     }
 
     private static string DetermineCompleteness(

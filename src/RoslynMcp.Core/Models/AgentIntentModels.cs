@@ -97,6 +97,7 @@ public sealed record ListTypesRequest(
     string? Kind = null,
     string? Accessibility = null,
     bool IncludeSummary = false,
+    bool IncludeMembers = false,
     int? Limit = null,
     int? Offset = null);
 
@@ -110,7 +111,8 @@ public sealed record TypeListEntry(
     bool IsPartial,
     int? Arity,
     string? Summary = null,
-    SymbolReference? Reference = null);
+    SymbolReference? Reference = null,
+    IReadOnlyList<string>? Members = null);
 
 public sealed record ListTypesResult(
     IReadOnlyList<TypeListEntry> Types,

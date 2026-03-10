@@ -132,6 +132,84 @@ public static partial class CodeUnderstandingExtensions
             reference);
     }
 
+    public static string? ToLightweightMemberEntry(this ISymbol member)
+    {
+        if (member.ToMemberKind() == null)
+        {
+            return null;
+        }
+
+        return $"{member.DeclaredAccessibility.NormalizeAccessibility()} {member.ToLightweightMemberSignature()}";
+    }
+
+    public static string ToLightweightMemberSignature(this ISymbol member)
+        => member switch
+        {
+            IMethodSymbol { MethodKind: MethodKind.Constructor or MethodKind.StaticConstructor } constructor
+                => $"{constructor.ContainingType.ToReadableTypeName()}({FormatParameters(constructor.Parameters)})",
+            IMethodSymbol method
+                => FormatMethodSignature(method),
+            IPropertySymbol property
+                => $"{property.Type.ToReadableTypeReference(includeNamespaces: false)} {FormatPropertyName(property)} {{ {FormatPropertyAccessors(property)} }}",
+            IFieldSymbol field
+                => $"{field.Type.ToReadableTypeReference(includeNamespaces: false)} {field.Name}",
+            IEventSymbol @event
+                => $"event {@event.Type.ToReadableTypeReference(includeNamespaces: false)} {@event.Name}",
+            _ => member.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)
+        };
+
+    private static string FormatMethodSignature(IMethodSymbol method)
+    {
+        if (method.MethodKind is MethodKind.UserDefinedOperator or MethodKind.Conversion)
+        {
+            return method.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
+        }
+
+        var typeParameters = method.TypeParameters.Length == 0
+            ? string.Empty
+            : $"<{string.Join(", ", method.TypeParameters.Select(static parameter => parameter.Name))}>";
+
+        return $"{method.ReturnType.ToReadableTypeReference(includeNamespaces: false)} {method.Name}{typeParameters}({FormatParameters(method.Parameters)})";
+    }
+
+    private static string FormatParameters(ImmutableArray<IParameterSymbol> parameters)
+        => string.Join(", ", parameters.Select(FormatParameter));
+
+    private static string FormatParameter(IParameterSymbol parameter)
+    {
+        var modifier = parameter switch
+        {
+            { IsParams: true } => "params ",
+            { RefKind: RefKind.Ref } => "ref ",
+            { RefKind: RefKind.Out } => "out ",
+            { RefKind: RefKind.In } => "in ",
+            _ => string.Empty
+        };
+
+        return $"{modifier}{parameter.Type.ToReadableTypeReference(includeNamespaces: false)} {parameter.Name}";
+    }
+
+    private static string FormatPropertyName(IPropertySymbol property)
+        => property.IsIndexer
+            ? $"this[{FormatParameters(property.Parameters)}]"
+            : property.Name;
+
+    private static string FormatPropertyAccessors(IPropertySymbol property)
+    {
+        var accessors = new List<string>(2);
+        if (property.GetMethod != null)
+        {
+            accessors.Add("get;");
+        }
+
+        if (property.SetMethod != null)
+        {
+            accessors.Add(property.SetMethod.IsInitOnly ? "init;" : "set;");
+        }
+
+        return string.Join(" ", accessors);
+    }
+
     public static string? ToTypeKind(this INamedTypeSymbol type)
     {
         if (type.IsRecord)
@@ -194,7 +272,7 @@ public static partial class CodeUnderstandingExtensions
 
     public static (string FilePath, int? StartLine, int? StartColumn, int? EndLine, int? EndColumn) GetSourceSpan(this ISymbol? symbol)
     {
-        if(symbol?.Locations.FirstOrDefault(static l => l.IsInSource) is not { } location)
+        if (symbol?.Locations.FirstOrDefault(static l => l.IsInSource) is not { } location)
             return (string.Empty, null, null, null, null);
 
         var span = location.GetLineSpan();
@@ -307,14 +385,14 @@ public static partial class CodeUnderstandingExtensions
                 case INamedTypeSymbol namedType:
                     return namedType.ToReadableQualifiedTypeName();
                 case IMethodSymbol method:
-                {
-                    var container = method.ContainingType?.ToReadableQualifiedTypeName() ?? method.ContainingNamespace.NormalizeNamespace();
-                    var methodName = method.MethodKind == MethodKind.Constructor
-                        ? method.ContainingType?.Name ?? method.Name
-                        : method.Name;
-                    var parameters = string.Join(", ", method.Parameters.Select(static parameter => parameter.Type.ToReadableTypeReference(includeNamespaces: false)));
-                    return $"{container}.{methodName}({parameters})";
-                }
+                    {
+                        var container = method.ContainingType?.ToReadableQualifiedTypeName() ?? method.ContainingNamespace.NormalizeNamespace();
+                        var methodName = method.MethodKind == MethodKind.Constructor
+                            ? method.ContainingType?.Name ?? method.Name
+                            : method.Name;
+                        var parameters = string.Join(", ", method.Parameters.Select(static parameter => parameter.Type.ToReadableTypeReference(includeNamespaces: false)));
+                        return $"{container}.{methodName}({parameters})";
+                    }
             }
 
             if (symbol.ContainingType != null)
