@@ -30,7 +30,8 @@ public sealed class RenameSymbolToolTests(ITestOutputHelper output)
         result.Error.ShouldBeNone();
         result.ChangedDocumentCount.Is(3);
         result.RenamedSymbolId.IsNotNull();
-        result.RenamedSymbolId!.ShouldNotBeEmpty();
+        result.RenamedSymbolId!.ShouldBeExternalSymbolId();
+        result.RenamedSymbolId.Is(resolved.Symbol!.SymbolId);
         result.ChangedFiles.Count.Is(3);
         result.ChangedFiles[0].ShouldEndWithPathSuffix(Path.Combine("ProjectApp", "AppOrchestrator.cs"));
         result.ChangedFiles[1].ShouldEndWithPathSuffix(Path.Combine("ProjectCore", "Contracts.cs"));

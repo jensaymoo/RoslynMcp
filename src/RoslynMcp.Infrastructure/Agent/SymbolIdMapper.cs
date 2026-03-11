@@ -2,42 +2,6 @@ using System.Collections.Concurrent;
 
 namespace RoslynMcp.Infrastructure.Agent;
 
-/// <summary>
-/// Static mapper for converting between internal Roslyn symbol IDs and external short string IDs.
-/// External IDs are short (e.g., "S0001"), token-friendly, and less error-prone for copy/paste.
-/// </summary>
-/// 
-/// <remarks>
-/// Integration points where symbol IDs flow between agent and Roslyn:
-/// 
-/// REQUESTS (Input - convert external ID to internal ID before passing to handler):
-/// - ListMembersRequest.TypeSymbolId → ListMembersTool
-/// - ListDependenciesRequest.SymbolId → ListDependenciesTool  
-/// - ExplainSymbolRequest.SymbolId → ExplainSymbolTool
-/// - ResolveSymbolRequest.SymbolId → ResolveSymbolTool
-/// - FindSymbolRequest.SymbolId
-/// - GetSignatureRequest.SymbolId
-/// - FindReferencesRequest.SymbolId
-/// - FindImplementationsRequest.SymbolId
-/// - GetTypeHierarchyRequest.SymbolId → GetTypeHierarchyTool
-/// - GetCallersRequest.SymbolId → FindCallersTool
-/// - GetCalleesRequest.SymbolId → FindCalleesTool
-/// - GetCallGraphRequest.SymbolId
-/// - RenameSymbolRequest.SymbolId → RenameSymbolTool
-/// - AddMethodRequest.TargetTypeSymbolId → AddMethodTool
-/// - DeleteMethodRequest.TargetMethodSymbolId → DeleteMethodTool
-/// - ReplaceMethodRequest.SymbolId, TargetMethodSymbolId → ReplaceMethodTool
-/// - ReplaceMethodBodyRequest.TargetMethodSymbolId → ReplaceMethodBodyTool
-/// 
-/// RESPONSES (Output - convert internal ID to external ID before returning to agent):
-/// - SymbolReference.SymbolId (via CodeUnderstandingExtensions.ToSymbolReference())
-/// - SymbolDescriptor.SymbolId (via NavigationModelExtensions.ToSymbolDescriptor())
-/// - TypeListEntry.SymbolId → ListTypesHandler
-/// - MemberListEntry.SymbolId → ListMembersHandler
-/// - ResolveSymbolBatchEntry.SymbolId → ResolveSymbolsBatchHandler
-/// - CallEdge.FromSymbolId, CallEdge.ToSymbolId → CallGraphService
-/// - MetricItem.SymbolId → AnalysisMetricsCollector
-/// </remarks>
 public static class SymbolIdMapper
 {
     private static readonly ConcurrentDictionary<string, string> internalToExternal = new();
@@ -56,7 +20,7 @@ public static class SymbolIdMapper
                 return existingId;
 
             var newId = Interlocked.Increment(ref _nextId);
-            var externalId = $"S{newId:D4}";
+            var externalId = $"S+{newId:D4}";
 
             internalToExternal[id] = externalId;
             externalToInternal[externalId] = id;

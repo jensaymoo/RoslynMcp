@@ -28,7 +28,9 @@ public sealed class ReplaceMethodBodyToolTests(ITestOutputHelper output)
         result.Status.Is("applied");
         result.ChangedFiles.Count.Is(1);
         result.ReplacedMethodBody.IsNotNull();
-        result.ReplacedMethodBody!.MethodSymbolId.ShouldNotBeEmpty();
+        result.TargetMethodSymbolId.ShouldBeExternalSymbolId();
+        result.ReplacedMethodBody!.MethodSymbolId.ShouldBeExternalSymbolId();
+        result.ReplacedMethodBody.MethodSymbolId.Is(targetMethodSymbolId);
         result.ReplacedMethodBody.Signature.Contains("Evaluate", StringComparison.Ordinal).IsTrue();
         result.DiagnosticsDelta.NewErrors.IsEmpty();
         result.DiagnosticsDelta.NewWarnings.IsEmpty();
