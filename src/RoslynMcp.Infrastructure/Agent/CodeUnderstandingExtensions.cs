@@ -70,7 +70,7 @@ public static partial class CodeUnderstandingExtensions
                 if (kind == null)
                     continue;
 
-                var key = SymbolIdentity.CreateId(member);
+                var key = member.CreateId();
 
                 if (seen.Add(key))
                     builder.Add(member);
@@ -144,7 +144,7 @@ public static partial class CodeUnderstandingExtensions
             if (member.ToMemberKind() == null)
                 return null;
 
-            return $"{member.DeclaredAccessibility.NormalizeAccessibility()} {member.ToLightweightMemberSignature()}";
+            return $"{member.CreateId().ToExternal()}: {member.DeclaredAccessibility.NormalizeAccessibility()} {member.ToLightweightMemberSignature()}";
         }
 
         public string ToLightweightMemberSignature()
@@ -394,7 +394,7 @@ public static partial class CodeUnderstandingExtensions
         public SymbolReference ToSymbolReference()
         {
             var (filePath, line, column) = symbol.GetDeclarationPosition();
-            var internalSymbolId = SymbolIdentity.CreateId(symbol);
+            var internalSymbolId = symbol.CreateId();
             return new SymbolReference(
                 internalSymbolId.ToExternal(),
                 symbol.ToReadableHandle(),

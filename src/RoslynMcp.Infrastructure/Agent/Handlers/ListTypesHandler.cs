@@ -230,7 +230,7 @@ internal sealed class ListTypesHandler(
             .OrderBy(static item => item.Kind, StringComparer.Ordinal)
             .ThenBy(static item => item.DisplayName, StringComparer.Ordinal)
             .ThenBy(static item => item.Signature, StringComparer.Ordinal)
-            .ThenBy(static item => SymbolIdentity.CreateId(item.Member), StringComparer.Ordinal)
+            .ThenBy(static item => item.Member.CreateId(), StringComparer.Ordinal)
             .Select(static item => item.Entry!)
             .ToArray();
     }
