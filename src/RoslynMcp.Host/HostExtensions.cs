@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Protocol;
 using RoslynMcp.Features;
@@ -12,6 +13,11 @@ namespace RoslynMcp.Host;
 
 public static class HostExtensions
 {
+    internal static string ServerVersion => Assembly.GetExecutingAssembly()?
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+        ?? typeof(HostExtensions).Assembly.GetName().Version?.ToString()
+        ?? "0.0.0";
+
     extension(IServiceCollection services)
     {
         public void Compose() => services
@@ -34,7 +40,7 @@ public static class HostExtensions
                 options.ServerInfo = new Implementation
                 {
                     Name = "RoslynMcp",
-                    Version = "0.1.0"
+                    Version = ServerVersion
                 };
             });
 
