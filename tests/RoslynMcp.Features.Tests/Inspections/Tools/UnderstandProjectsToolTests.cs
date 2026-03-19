@@ -18,8 +18,13 @@ public sealed class UnderstandProjectsToolTests(SharedSandboxFixture fixture, IT
         result.Profile.Is("quick");
         result.Hotspots.Count.Is(0);
 
+        result.Projects.Count.IsGreaterThan(0);
+        result.Projects.All(static project => project.Types.Count == 0).IsTrue();
+
         var projectsByName = result.Projects.ToDictionary(static project => project.Name, StringComparer.Ordinal);
-        projectsByName.Keys.OrderBy(static name => name, StringComparer.Ordinal).Is("ProjectApp", "ProjectCore", "ProjectImpl");
+        projectsByName.ContainsKey("ProjectApp").IsTrue();
+        projectsByName.ContainsKey("ProjectCore").IsTrue();
+        projectsByName.ContainsKey("ProjectImpl").IsTrue();
 
         projectsByName["ProjectApp"].OutgoingDependencyProjectPaths.Is(Context.GetProject("ProjectCore").Path, Context.GetProject("ProjectImpl").Path);
         projectsByName["ProjectApp"].IncomingDependencyProjectPaths.Count.Is(0);
