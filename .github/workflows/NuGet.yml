@@ -24,7 +24,7 @@ jobs:
 #      run: dotnet test --verbosity normal
       
     - name: Build package
-      run: dotnet pack ./src/RoslynMcp.Host/RoslynMcp.Host.csproj --output .nupkg
+      run: dotnet pack ./src/RoslynMcp.Host/RoslynMcp.Host.csproj --output .nupkg --no-restore
       
     - name: Add GitHub Packages source
       run: |
