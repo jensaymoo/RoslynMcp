@@ -26,6 +26,17 @@ jobs:
     - name: Build package
       run: dotnet pack ./src/RoslynMcp.Host/RoslynMcp.Host.csproj --output .nupkg
       
+    - name: Add GitHub Packages source
+      run: dotnet nuget add source \
+        --username ${{ github.actor }} \
+        --password ${{ secrets.GITHUB_TOKEN }} \
+        --store-password-in-clear-text \
+        --name github \
+        "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
+
     - name: Publish package
-      working-directory: ./.nupkg
-      run: dotnet nuget push **/*.nupkg --api-key ${{ secrets.NUGET_KEY }} --skip-duplicate --source https://api.nuget.org/v3/index.json
+      working-directory: ./.nupkg 
+      run: dotnet nuget push **/*.nupkg \
+        --source github \
+        --api-key ${{ secrets.GITHUB_TOKEN }} \
+        --skip-duplicate
