@@ -4,8 +4,8 @@ An MCP server that provides AI agents with Roslyn-based code analysis capabiliti
 
 ## Get It on NuGet
 
-[![NuGet](https://img.shields.io/nuget/v/RoslynMcp.svg)](https://www.nuget.org/packages/RoslynMcp/)
-[![.NET](https://img.shields.io/badge/.NET-10.0-blue)](https://www.nuget.org/packages/RoslynMcp/)
+[![NuGet](https://img.shields.io/nuget/v/AlterRoslynMcp.svg)](https://www.nuget.org/packages/AlterRoslynMcp/)
+[![.NET](https://img.shields.io/badge/.NET-10.0-blue)](https://www.nuget.org/packages/AlterRoslynMcp/)
 
 _This project uses Roslynator, licensed under Apache 2.0._
 
