@@ -35,10 +35,18 @@ jobs:
           --name github \
           "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
 
-    - name: Publish package
+    - name: Publish to GitHub
       working-directory: ./.nupkg 
       run: | 
         dotnet nuget push **/*.nupkg \
           --source github \
           --api-key ${{ secrets.GITHUB_TOKEN }} \
           --skip-duplicate
+
+#    - name: Publish to NuGet.org
+#      working-directory: ./.nupkg 
+#      run: | 
+#        dotnet nuget push **/*.nupkg \
+#          --source https://api.nuget.org/v3/index.json \
+#          --api-key ${{ secrets.GITHUB_TOKEN }} \
+#          --skip-duplicate
